@@ -1,0 +1,95 @@
+"""The loop, the tools and the guardrails, with a scripted LLM so no key is needed."""
+from ghanti.agent.loop import MAX_ROUNDS, run_turn
+from ghanti.agent.parent_tools import PARENT_TOOLS
+from ghanti.agent.teacher_tools import TEACHER_TOOLS
+from ghanti.llm import Reply, ToolCall
+from ghanti.llm.scripted import ScriptedLLM
+from ghanti.models import Action, Attendance, Fee, Homework, InboxItem, Note, Student
+from ghanti.services import actions
+
+
+def call(tool, **args):
+    return ToolCall(id=tool, name=tool, args=args)
+
+
+def test_one_sentence_two_homeworks(teacher_ctx):
+    llm = ScriptedLLM([
+        Reply("", [call("add_homework", class_name="8B", subject="physics", task="Lesson 3, examples 1 to 5"),
+                   call("add_homework", class_name="class 8b", subject="chemistry", task="Read lesson 2")]),
+        Reply("Added physics and chemistry homework for 8B."),
+    ])
+    reply = run_turn(llm, "system", TEACHER_TOOLS, teacher_ctx, [], "8B physics homework is ...")
+    assert reply.startswith("Added")
+    saved = teacher_ctx.db.query(Homework).filter_by(assigned_date=teacher_ctx.today).all()
+    assert {h.subject for h in saved} == {"Physics", "Chemistry"}
+    assert len(teacher_ctx.action_ids) == 2 and all(t["ok"] for t in teacher_ctx.trace)
+    # the tool results went back to the model before it answered
+    assert llm.seen[1][-1].role == "tool" and len(llm.seen[1][-1].tool_results) == 2
+
+
+def test_two_rohans_are_flagged(teacher_ctx):
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("find_student", name="Rohan")).content
+    assert len(result["matches"]) == 2 and "which one" in result["note"]
+
+
+def test_misheard_name_gets_the_roster(teacher_ctx):
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("find_student", name="Zubin")).content
+    assert result["matches"] == [] and "Aarav Patel" in result["note"]
+
+
+def test_attendance_then_undo(teacher_ctx):
+    db = teacher_ctx.db
+    meera = db.query(Student).filter_by(name="Meera Nair").one()
+    TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", student_ids=[meera.id], status="absent"))
+    assert db.query(Attendance).filter_by(student_id=meera.id, date=teacher_ctx.today).one().status == "absent"
+    actions.undo(db, db.get(Action, teacher_ctx.action_ids[0]))
+    assert db.query(Attendance).filter_by(student_id=meera.id, date=teacher_ctx.today).first() is None
+
+
+def test_fee_waits_for_confirm(teacher_ctx):
+    db = teacher_ctx.db
+    kabir = db.query(Student).filter_by(name="Kabir Singh").one()
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("update_fee", student_id=kabir.id, kind="payment", amount=5000))
+    assert result.content["needs_confirmation"]
+    fee = db.query(Fee).filter_by(student_id=kabir.id).one()
+    assert fee.amount_paid == 0  # nothing moved yet
+    action = db.get(Action, teacher_ctx.action_ids[0])
+    actions.confirm(db, action)
+    assert fee.amount_paid == 5000
+    actions.undo(db, action)
+    assert fee.amount_paid == 0
+
+
+def test_bad_arguments_come_back_as_an_error_not_a_crash(teacher_ctx):
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", student_ids=[1], status="sleeping"))
+    assert "error" in result.content and teacher_ctx.trace[-1]["ok"] is False
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("add_student_note", student_id=9999, note="x"))
+    assert "find_student" in result.content["error"]
+
+
+def test_loop_stops_after_max_rounds(teacher_ctx):
+    stuck = Reply("", [call("get_class_summary")])
+    llm = ScriptedLLM([stuck] * MAX_ROUNDS + [Reply("Here is what I found.")])
+    assert run_turn(llm, "system", TEACHER_TOOLS, teacher_ctx, [], "loop forever") == "Here is what I found."
+    assert len(teacher_ctx.trace) == MAX_ROUNDS
+
+
+def test_parent_never_hears_private_notes(parent_ctx):
+    notes = PARENT_TOOLS.dispatch(parent_ctx, call("get_teacher_notes")).content["notes"]
+    assert len(notes) == 1 and "fallen behind" in notes[0]["note"]
+    assert parent_ctx.db.query(Note).filter_by(student_id=parent_ctx.student.id, private=True).count() == 1
+
+
+def test_parent_tools_cannot_be_pointed_at_another_child(parent_ctx):
+    # No parent tool has a student parameter at all, so there's nothing to aim.
+    for schema in PARENT_TOOLS.schemas():
+        assert not any("student" in key for key in schema["parameters"]["properties"])
+    absent = PARENT_TOOLS.dispatch(parent_ctx, call("get_attendance", days=7)).content
+    assert len(absent["absent_on"]) == 3  # Kabir's own three days, from the seed
+
+
+def test_question_reaches_the_teacher(parent_ctx):
+    PARENT_TOOLS.dispatch(parent_ctx, call("ask_teacher", question="Can Kabir get extra science help?",
+                                           parent_words="कबीर को साइंस में मदद मिल सकती है?"))
+    item = parent_ctx.db.query(InboxItem).one()
+    assert item.kind == "question" and item.student_id == parent_ctx.student.id and item.status == "open"
