@@ -6,6 +6,13 @@ their child in their own language and can ask anything back.
 My entry for Gnani AI's Great Indian AI Internship Challenge, built on Gnani's
 Prisma (speech to text) and Timbre (text to speech).
 
+## Architecture
+
+<img src="docs/architecture.svg" alt="Architecture: a teacher and a parent reach the server through their pages. The server steps are the school API, listen, agent, tools, speak and reports. Tools read and save school records in the DB, and speech and model APIs sit outside." width="100%">
+
+Speech to text is Gnani's Prisma and text to speech is Gnani's Timbre. The
+website stands in for the phone call a parent would really get.
+
 ## How the agent works
 
 The main idea is tool calling through a small harness: the model asks for a
