@@ -40,6 +40,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-voice: var(--voice);
+  --color-shell: var(--shell);
   --color-voice-foreground: var(--voice-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -61,12 +62,12 @@
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted: oklch(0.965 0.004 85);
+  --muted-foreground: oklch(0.5 0.01 85);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
+  --border: oklch(0.915 0.004 85);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.87 0 0);
@@ -76,13 +77,15 @@
   --chart-5: oklch(0.269 0 0);
   --radius: 0.5rem;
   /* the one accent: a warm bell-metal amber for anything voice */
-  --voice: oklch(0.75 0.15 70);
+  --voice: oklch(0.78 0.155 72);
   --voice-foreground: oklch(0.25 0.05 60);
-  --sidebar: oklch(0.985 0 0);
+  /* the page behind the app shell: a warm off-white, shared by the sidebar */
+  --shell: oklch(0.968 0.005 85);
+  --sidebar: var(--shell);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent: oklch(0.925 0.007 85);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);

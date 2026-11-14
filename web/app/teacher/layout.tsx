@@ -1,26 +1,26 @@
 "use client";
 
 import {
-  BellRing,
-  BookOpen,
+  ArrowCounterClockwise,
+  BellRinging,
+  BookOpenText,
   CalendarCheck,
-  ChevronsUpDown,
-  Inbox,
-  IndianRupee,
-  LogOut,
-  MessageCircle,
+  CaretUpDown,
+  ChatCircleDots,
+  CurrencyInr,
+  PaperPlaneTilt,
   PhoneOutgoing,
-  RotateCcw,
-  Send,
-  Users,
-} from "lucide-react";
+  SignOut,
+  Tray,
+  UsersThree,
+} from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import { Chip } from "@/components/bits";
+import { Person, Status } from "@/components/bits";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -44,23 +45,22 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { api, fetcher } from "@/lib/api";
-import { initials } from "@/lib/format";
 import { useLogout, useMe } from "@/lib/session";
 
-type Overview = { classes: string[]; inbox_open: number };
+type Overview = { classes: string[]; inbox_open: number; homework: unknown[] };
 
 const NAV = [
-  { label: "Assistant", items: [{ href: "/teacher", title: "Chat", icon: MessageCircle }] },
+  { label: "Assistant", items: [{ href: "/teacher", title: "Chat", icon: ChatCircleDots }] },
   {
     label: "Class",
     items: [
-      { href: "/teacher/homework", title: "Homework", icon: BookOpen },
+      { href: "/teacher/homework", title: "Homework", icon: BookOpenText },
       { href: "/teacher/attendance", title: "Attendance", icon: CalendarCheck },
-      { href: "/teacher/students", title: "Students", icon: Users },
-      { href: "/teacher/fees", title: "Fees", icon: IndianRupee },
+      { href: "/teacher/students", title: "Students", icon: UsersThree },
+      { href: "/teacher/fees", title: "Fees", icon: CurrencyInr },
     ],
   },
-  { label: "Parents", items: [{ href: "/teacher/inbox", title: "Inbox", icon: Inbox }] },
+  { label: "Parents", items: [{ href: "/teacher/inbox", title: "Inbox", icon: Tray }] },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
@@ -72,6 +72,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const [sending, setSending] = useState<string | null>(null);
 
   if (!me) return null;
+
+  const counts: Record<string, number | undefined> = {
+    Homework: overview?.homework.length,
+    Inbox: overview?.inbox_open,
+  };
 
   // Refetch everything on screen. Used after anything that changes school data.
   const refresh = () => mutate((key) => typeof key === "string" && key.startsWith("/teacher"));
@@ -95,60 +100,63 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon">
+    <SidebarProvider style={{ "--sidebar-width": "15rem" } as React.CSSProperties}>
+      <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2.5 px-1 py-1.5">
+          <div className="flex h-9 items-center gap-2.5 px-1">
             <div className="grid size-7 shrink-0 place-items-center rounded-lg bg-voice text-voice-foreground">
-              <BellRing className="size-4" />
+              <BellRinging weight="fill" className="size-4" />
             </div>
-            <span className="font-semibold tracking-tight group-data-[collapsible=icon]:hidden">Ghanti</span>
+            <span className="text-[15px] font-semibold tracking-tight group-data-[collapsible=icon]:hidden">Ghanti</span>
           </div>
         </SidebarHeader>
+
         <SidebarContent>
           {NAV.map((group) => (
             <SidebarGroup key={group.label}>
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={path === item.href} tooltip={item.title}>
-                      <Link href={item.href}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    {item.title === "Inbox" && !!overview?.inbox_open && (
-                      <SidebarMenuBadge>{overview.inbox_open}</SidebarMenuBadge>
-                    )}
-                  </SidebarMenuItem>
-                ))}
+                {group.items.map((item) => {
+                  const active = path === item.href;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={item.title} className="rounded-xl">
+                        <Link href={item.href}>
+                          <item.icon weight={active ? "fill" : "regular"} />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {!!counts[item.title] && <SidebarMenuBadge>{counts[item.title]}</SidebarMenuBadge>}
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroup>
           ))}
         </SidebarContent>
+
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg">
-                    <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-xs font-semibold">
-                      {initials(me.name)}
-                    </div>
+                  <SidebarMenuButton size="lg" className="rounded-xl">
+                    <Person name={me.name} />
                     <div className="grid flex-1 text-left leading-tight">
-                      <span className="text-xs text-muted-foreground">Class teacher</span>
                       <span className="truncate text-sm font-medium">{me.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Class teacher, {overview?.classes.join(", ")}
+                      </span>
                     </div>
-                    <ChevronsUpDown className="ml-auto size-4" />
+                    <CaretUpDown className="ml-auto text-muted-foreground" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-56">
                   <DropdownMenuItem onClick={reset}>
-                    <RotateCcw /> Reset demo data
+                    <ArrowCounterClockwise /> Reset demo data
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={logout}>
-                    <LogOut /> Log out
+                    <SignOut /> Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -157,30 +165,31 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="bg-transparent md:p-2">
-        <div className="flex min-h-[calc(100dvh-1rem)] flex-col border bg-background md:rounded-3xl">
-          <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
-            <SidebarTrigger />
-            <div className="flex items-center gap-2 rounded-xl border px-2.5 py-1 text-sm">
-              <span className="font-medium">Class {overview?.classes.join(", ") ?? "…"}</span>
-              <span className="text-muted-foreground">
-                {new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <Chip tone={me.speech_mode === "gnani" ? "good" : "neutral"}>
+      <SidebarInset className="min-h-[calc(100dvh-1rem)] border md:peer-data-[variant=inset]:rounded-3xl md:peer-data-[variant=inset]:shadow-none">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
+          <SidebarTrigger className="text-muted-foreground" />
+          <Separator orientation="vertical" className="data-[orientation=vertical]:h-4" />
+          <div className="text-sm">
+            <span className="font-medium">Class {overview?.classes.join(", ")}</span>
+            <span className="ml-2 hidden text-muted-foreground sm:inline">
+              {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
+            </span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="mr-1 hidden md:inline-flex">
+              <Status tone={me.speech_mode === "gnani" ? "good" : "neutral"}>
                 {me.speech_mode === "gnani" ? "Gnani speech live" : "Mock speech"}
-              </Chip>
-              <Button variant="outline" size="sm" disabled={!!sending} onClick={() => send("homework")}>
-                <Send /> {sending === "homework" ? "Sending…" : "Send homework"}
-              </Button>
-              <Button size="sm" disabled={!!sending} onClick={() => send("weekly")}>
-                <PhoneOutgoing /> {sending === "weekly" ? "Writing calls…" : "Weekly call"}
-              </Button>
-            </div>
-          </header>
-          <main className="flex-1 p-4 md:p-6">{children}</main>
-        </div>
+              </Status>
+            </span>
+            <Button variant="outline" size="sm" disabled={!!sending} onClick={() => send("homework")}>
+              <PaperPlaneTilt weight="fill" /> {sending === "homework" ? "Sending…" : "Send homework"}
+            </Button>
+            <Button size="sm" disabled={!!sending} onClick={() => send("weekly")}>
+              <PhoneOutgoing weight="fill" /> {sending === "weekly" ? "Writing calls…" : "Weekly call"}
+            </Button>
+          </div>
+        </header>
+        <div className="flex-1 px-5 py-6 md:px-8 md:py-8">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

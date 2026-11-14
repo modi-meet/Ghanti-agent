@@ -5,6 +5,7 @@ import type { NextConfig } from "next";
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
+  devIndicators: false, // keeps the dev badge out of screen recordings
   turbopack: {
     rules: {
       "*.css": {

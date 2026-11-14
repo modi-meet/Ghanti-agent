@@ -1,31 +1,47 @@
 "use client";
 
-import { ChevronRight, Wrench } from "lucide-react";
+import {
+  ArrowRight,
+  BellRinging,
+  BookOpenText,
+  CalendarCheck,
+  CaretRight,
+  CurrencyInr,
+  NotePencil,
+  Question,
+  Wrench,
+} from "@phosphor-icons/react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import { ActionCard } from "@/components/action-card";
-import { PageHeader, Panel, PlayButton, Stat } from "@/components/bits";
+import { ActionList } from "@/components/action-card";
+import { ListenButton, PageHeader, Person, Section, Tag } from "@/components/bits";
 import { Composer, type Said } from "@/components/composer";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Kbd } from "@/components/ui/kbd";
+import { Spinner } from "@/components/ui/spinner";
 import { fetcher, say, type Exchange, type Turn } from "@/lib/api";
+import { rupees } from "@/lib/format";
 import { play } from "@/lib/player";
 import { cn } from "@/lib/utils";
 
 type Overview = {
   students: number;
-  absent_today: number;
-  homework_today: number;
-  fees_pending: number;
+  absent: string[];
+  late: string[];
+  homework: { subject: string; task: string }[];
+  fees_pending: { count: number; amount: number };
   inbox_open: number;
 };
 
 const TRY = [
-  "Class 8B physics homework is lesson 3 examples 1 to 5, and in chemistry read lesson 2 fully for tomorrow",
-  "Aarav and Diya are absent today",
-  "Note for Meera: she topped the science quiz this week",
-  "Kabir's parents paid 5000 rupees towards the term fee",
-  "Who has been absent the most this week?",
+  { icon: BookOpenText, line: "Class 8B physics homework is lesson 3 examples 1 to 5, and in chemistry read lesson 2 fully for tomorrow" },
+  { icon: CalendarCheck, line: "Aarav and Diya are absent today" },
+  { icon: NotePencil, line: "Note for Meera: she topped the science quiz this week" },
+  { icon: CurrencyInr, line: "Kabir's parents paid 5000 rupees towards the term fee" },
+  { icon: Question, line: "Who has been absent the most this week?" },
 ];
 
 export default function Chat() {
@@ -40,7 +56,8 @@ export default function Chat() {
   }, [turns, busy]);
 
   // The dashboard tabs read the same data, so nudge them after anything changes.
-  const refreshDashboard = () => mutate((key) => typeof key === "string" && key.startsWith("/teacher/") && key !== "/teacher/chat");
+  const refreshDashboard = () =>
+    mutate((key) => typeof key === "string" && key.startsWith("/teacher/") && key !== "/teacher/chat");
 
   async function send(said: Said) {
     setBusy(true);
@@ -57,75 +74,122 @@ export default function Chat() {
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_260px]">
-      <div className="flex min-h-[calc(100dvh-11rem)] flex-col">
+    <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="flex min-h-[calc(100dvh-9.5rem)] flex-col">
         <PageHeader title="Chat" hint="Say what happened in class. Ghanti files it, and parents see the same thing." />
 
-        <div className="mt-6 flex-1 space-y-5">
+        <div className="mt-8 flex-1 space-y-6">
           {turns?.length === 0 && (
-            <Panel>
-              <div className="text-sm font-medium">Hold the mic and try one of these</div>
-              <div className="mt-3 flex flex-col items-start gap-2">
-                {TRY.map((line) => (
-                  <button
-                    key={line}
-                    disabled={busy}
-                    onClick={() => send({ text: line })}
-                    className="rounded-lg border px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  >
-                    “{line}”
+            <ItemGroup className="gap-2">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Try saying</div>
+              {TRY.map(({ icon: Icon, line }) => (
+                <Item key={line} variant="outline" size="sm" asChild className="flex-nowrap bg-card">
+                  <button disabled={busy} onClick={() => send({ text: line })} className="text-left">
+                    <ItemMedia variant="icon">
+                      <Icon weight="duotone" className="size-5" />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle className="line-clamp-none font-normal">{line}</ItemTitle>
+                    </ItemContent>
+                    <ItemActions>
+                      <ArrowRight className="size-4 text-muted-foreground" />
+                    </ItemActions>
                   </button>
-                ))}
-              </div>
-            </Panel>
+                </Item>
+              ))}
+            </ItemGroup>
           )}
-          {turns?.map((turn) => <Bubble key={turn.id} turn={turn} onChange={refreshDashboard} />)}
-          {busy && <div className="text-sm text-muted-foreground">Ghanti is working on it…</div>}
+          {turns?.map((turn) => <Message key={turn.id} turn={turn} onChange={refreshDashboard} />)}
+          {busy && (
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Mark />
+              <Spinner /> Working on it
+            </div>
+          )}
           <div ref={bottom} />
         </div>
 
-        <div className="sticky bottom-0 -mx-1 mt-4 bg-background px-1 pt-2 pb-1">
-          <Composer onSend={send} busy={busy} placeholder="Hold the mic to talk, or type here" />
+        <div className="sticky bottom-0 -mx-2 mt-6 bg-background px-2 pt-2 pb-1">
+          <Composer onSend={send} busy={busy} placeholder="Tell Ghanti what happened in class" />
+          <p className="mt-2 px-1 text-xs text-muted-foreground">
+            Hold the mic, or focus it and hold <Kbd>Space</Kbd>, to talk. Hindi and English mixed is fine.
+          </p>
         </div>
       </div>
 
       <aside className="hidden lg:block">
-        <Panel className="sticky top-6">
-          <div className="text-lg font-semibold tracking-tight">Today</div>
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
-            <Stat value={overview?.homework_today ?? "–"} label="Homework given" />
-            <Stat value={overview?.absent_today ?? "–"} unit={`/ ${overview?.students ?? "–"}`} label="Absent" />
-            <Stat value={overview?.fees_pending ?? "–"} label="Fees pending" />
-            <Stat value={overview?.inbox_open ?? "–"} label="From parents" />
-          </div>
-          <p className="mt-5 border-t pt-4 text-xs text-muted-foreground">
-            These change as you talk. Open a tab on the left to see or fix the entries.
-          </p>
-        </Panel>
+        <Section title="Today" className="sticky top-8">
+          <dl className="space-y-5 text-sm">
+            <Glance label="Homework given" empty="Nothing yet" has={!!overview?.homework.length}>
+              <div className="flex flex-wrap gap-1.5">
+                {overview?.homework.map((h) => (
+                  <Tag key={h.subject + h.task} dot={h.subject}>
+                    {h.subject}
+                  </Tag>
+                ))}
+              </div>
+            </Glance>
+            <Glance label="Absent" empty="Everyone is in" has={!!overview?.absent.length}>
+              <div className="space-y-1.5">
+                {overview?.absent.map((name) => (
+                  <div key={name} className="flex items-center gap-2">
+                    <Person name={name} size="sm" /> {name}
+                  </div>
+                ))}
+              </div>
+            </Glance>
+            <Glance label="Fees pending" empty="All paid" has={!!overview?.fees_pending.count}>
+              <span className="font-medium tabular-nums">{rupees(overview?.fees_pending.amount ?? 0)}</span>
+              <span className="text-muted-foreground"> from {overview?.fees_pending.count} families</span>
+            </Glance>
+            <Glance label="From parents" empty="Nothing waiting" has={!!overview?.inbox_open}>
+              <Link href="/teacher/inbox" className="inline-flex items-center gap-1 font-medium hover:underline">
+                {overview?.inbox_open} waiting for a reply <ArrowRight className="size-3.5" />
+              </Link>
+            </Glance>
+          </dl>
+        </Section>
       </aside>
     </div>
   );
 }
 
-function Bubble({ turn, onChange }: { turn: Turn; onChange: () => void }) {
+function Glance({ label, empty, has, children }: { label: string; empty: string; has: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1.5">{has ? children : <span className="text-muted-foreground">{empty}</span>}</dd>
+    </div>
+  );
+}
+
+// Ghanti's mark, next to everything it says.
+function Mark() {
+  return (
+    <div className="grid size-7 shrink-0 place-items-center rounded-lg bg-voice text-voice-foreground">
+      <BellRinging weight="fill" className="size-4" />
+    </div>
+  );
+}
+
+function Message({ turn, onChange }: { turn: Turn; onChange: () => void }) {
   if (turn.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm text-primary-foreground">
-          {turn.text}
-        </div>
+        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-sm leading-relaxed">{turn.text}</div>
       </div>
     );
   }
   return (
-    <div className="max-w-[85%] space-y-2">
-      <div className="rounded-2xl rounded-bl-md border bg-card px-3.5 py-2 text-sm">{turn.text}</div>
-      {turn.actions.map((a) => (
-        <ActionCard key={a.id} action={a} onChange={onChange} />
-      ))}
-      <div className="flex items-center gap-2">
-        {turn.audio_url && <PlayButton url={turn.audio_url} />}
-        {turn.trace.length > 0 && <Trace turn={turn} />}
+    <div className="flex gap-3">
+      <Mark />
+      <div className="min-w-0 flex-1 space-y-3">
+        <p className="pt-1 text-sm leading-relaxed">{turn.text}</p>
+        {turn.actions.length > 0 && <ActionList actions={turn.actions} onChange={onChange} />}
+        <div className="-ml-2 flex flex-wrap items-start gap-x-1">
+          {turn.audio_url && <ListenButton url={turn.audio_url} />}
+          {turn.trace.length > 0 && <Trace turn={turn} />}
+        </div>
       </div>
     </div>
   );
@@ -135,20 +199,21 @@ function Bubble({ turn, onChange }: { turn: Turn; onChange: () => void }) {
 function Trace({ turn }: { turn: Turn }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="text-xs text-muted-foreground">
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 hover:text-foreground">
-        <Wrench className="size-3" />
+    <div className="min-w-0 text-xs text-muted-foreground">
+      <button onClick={() => setOpen(!open)} className="flex h-6 items-center gap-1 rounded-md px-2 hover:bg-muted hover:text-foreground">
+        <Wrench weight="fill" className="size-3" />
         {turn.trace.length} tool {turn.trace.length === 1 ? "call" : "calls"}
-        <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
+        <CaretRight className={cn("size-3 transition-transform", open && "rotate-90")} />
       </button>
       {open && (
-        <div className="mt-1.5 space-y-1 rounded-lg border bg-muted/50 p-2 font-mono">
+        <ol className="mt-1.5 ml-2 space-y-1 border-l pl-3 font-mono">
           {turn.trace.map((t, i) => (
-            <div key={i} className={cn("break-all", !t.ok && "text-red-600")}>
-              {t.name}({JSON.stringify(t.args)}) <span className="tabular-nums opacity-60">{t.ms}ms</span>
-            </div>
+            <li key={i} className={cn("break-all", !t.ok && "text-red-600")}>
+              <span className="text-foreground">{t.name}</span>({JSON.stringify(t.args)}){" "}
+              <span className="tabular-nums opacity-60">{t.ms}ms</span>
+            </li>
           ))}
-        </div>
+        </ol>
       )}
     </div>
   );

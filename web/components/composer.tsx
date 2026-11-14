@@ -1,45 +1,53 @@
 "use client";
 
-import { SendHorizontal } from "lucide-react";
+import { ArrowUp } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { MicButton } from "@/components/mic-button";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { cn } from "@/lib/utils";
 
 export type Said = { audio?: Blob; text?: string };
 
-// Mic on the left, a text box for when talking isn't an option.
+// One bar: type on the left, send and mic on the right.
 export function Composer({
   onSend,
   busy,
   placeholder,
+  className,
 }: {
   onSend: (said: Said) => void;
   busy: boolean;
   placeholder: string;
+  className?: string;
 }) {
   const [text, setText] = useState("");
+  const ready = !!text.trim() && !busy;
   return (
     <form
-      className="flex items-center gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!text.trim() || busy) return;
+        if (!ready) return;
         onSend({ text: text.trim() });
         setText("");
       }}
     >
-      <MicButton busy={busy} onClip={(audio) => onSend({ audio })} />
-      <Input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={placeholder}
-        className="h-11 rounded-xl"
-      />
-      <Button type="submit" size="icon-lg" variant="outline" disabled={busy || !text.trim()} aria-label="Send">
-        <SendHorizontal />
-      </Button>
+      <InputGroup className={cn("h-12 rounded-2xl bg-card pl-1.5", className)}>
+        <InputGroupInput value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
+        <InputGroupAddon align="inline-end" className="gap-1.5 pr-1.5">
+          <InputGroupButton
+            type="submit"
+            size="icon-sm"
+            variant={ready ? "default" : "ghost"}
+            aria-disabled={!ready}
+            aria-label="Send"
+            className="rounded-full aria-disabled:text-muted-foreground/60"
+          >
+            <ArrowUp weight="bold" />
+          </InputGroupButton>
+          <MicButton busy={busy} onClip={(audio) => onSend({ audio })} />
+        </InputGroupAddon>
+      </InputGroup>
     </form>
   );
 }

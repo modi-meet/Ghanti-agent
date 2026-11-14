@@ -1,16 +1,18 @@
 "use client";
 
-import { BellRing, BookOpen, CornerDownRight, LogOut, Phone, PhoneIncoming } from "lucide-react";
+import { ArrowBendDownRight, BookOpenText, CaretRight, ChatsCircle, Phone, PhoneIncoming, SignOut } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR from "swr";
 
 import { CallScreen, type SchoolMessage } from "@/components/call-screen";
-import { Chip, Empty, Panel, Stat } from "@/components/bits";
+import { MARK_COLOR, Nothing, Person, Section, Stat, Status, Tag } from "@/components/bits";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { fetcher, LANGUAGES } from "@/lib/api";
 import { day, rupees, time } from "@/lib/format";
 import { unlock } from "@/lib/player";
 import { useLogout, useMe } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 type Home = {
   child: { name: string; class: string; roll_no: number };
@@ -21,13 +23,13 @@ type Home = {
   fees: { fee: string; total: number; paid: number; balance: number; due_on: string; overdue: boolean }[];
 };
 
-const ICON = { weekly: PhoneIncoming, homework: BookOpen, reply: CornerDownRight };
+const ICON = { weekly: PhoneIncoming, homework: BookOpenText, reply: ArrowBendDownRight };
 
 export default function ParentHome() {
   const me = useMe("parent");
   const logout = useLogout();
   const { data, mutate } = useSWR<Home>(me ? "/parent/home" : null, fetcher, { refreshInterval: 20000 });
-  // undefined: no call. null: the parent rang the school. A message: the school rang them.
+  // undefined: no call. A null message: the parent rang the school. A message: the school rang them.
   const [call, setCall] = useState<{ message: SchoolMessage | null; ring: boolean; key: number } | undefined>();
 
   // unlock() runs in the tap itself, so the phone lets the school's voice play later.
@@ -42,6 +44,7 @@ export default function ParentHome() {
   const caller = `${first}'s school · Class ${data.child.class}`;
   const ringing = data.messages.find((m) => m.kind === "weekly" && !m.heard);
   const due = data.fees.filter((f) => f.balance > 0);
+  const { attendance } = data;
 
   if (call) {
     return (
@@ -59,116 +62,141 @@ export default function ParentHome() {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-4 px-4 py-5">
-      <header className="flex items-center gap-2.5">
-        <div className="grid size-8 place-items-center rounded-lg bg-voice text-voice-foreground">
-          <BellRing className="size-4" />
-        </div>
-        <div className="flex-1 leading-tight">
-          <div className="text-sm font-semibold tracking-tight">{me.name}</div>
-          <div className="text-xs text-muted-foreground">
-            {data.child.name} · Class {data.child.class} · {LANGUAGES[me.language]}
+    <div className="mx-auto max-w-md space-y-4 px-4 pt-4 pb-10">
+      <header className="flex items-center gap-3 py-1">
+        <Person name={data.child.name} size="lg" />
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="font-semibold tracking-tight">{data.child.name}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            Class {data.child.class} · {data.teacher} · {LANGUAGES[me.language]}
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out">
-          <LogOut />
+        <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out" className="text-muted-foreground">
+          <SignOut />
         </Button>
       </header>
 
       {ringing && (
         <button
           onClick={() => open(ringing, true)}
-          className="flex w-full items-center gap-3 rounded-2xl bg-neutral-950 p-4 text-left text-neutral-50"
+          className="flex w-full items-center gap-3.5 rounded-2xl bg-stone-950 p-4 text-left text-stone-50"
         >
-          <div className="relative grid size-11 place-items-center rounded-full bg-emerald-600">
-            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-600/50" />
-            <Phone className="relative size-5" />
-          </div>
-          <div className="flex-1">
-            <div className="font-semibold tracking-tight">The school is calling</div>
-            <div className="text-xs text-neutral-400">{ringing.title} · tap to answer</div>
-          </div>
+          <span className="relative grid size-11 shrink-0 place-items-center rounded-full bg-emerald-600">
+            <span className="absolute -inset-1 animate-ping rounded-full border-2 border-emerald-500/70" />
+            <Phone weight="fill" className="size-5" />
+          </span>
+          <span className="flex-1">
+            <span className="block font-semibold tracking-tight">The school is calling</span>
+            <span className="block text-xs text-stone-400">{ringing.title}</span>
+          </span>
+          <span className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-sm font-medium">Answer</span>
         </button>
       )}
 
-      <Panel>
-        <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold tracking-tight">From the school</div>
+      <Section title="This week" flush>
+        <div className="grid grid-cols-2 divide-x">
+          <div className="px-5 py-4">
+            <Stat value={attendance.days_present} unit={`of ${attendance.school_days} days`} label="In school" />
+          </div>
+          <div className="px-5 py-4">
+            <Stat value={rupees(due.reduce((n, f) => n + f.balance, 0))} label="Fees due" />
+          </div>
+        </div>
+        {(attendance.absent_on.length > 0 || attendance.late_on.length > 0 || due.length > 0) && (
+          <ul className="divide-y border-t text-sm">
+            {attendance.absent_on.map((d) => (
+              <Line key={d} mark="absent" label="Absent" value={d} />
+            ))}
+            {attendance.late_on.map((d) => (
+              <Line key={d} mark="late" label="Late" value={d} />
+            ))}
+            {due.map((f) => (
+              <li key={f.fee} className="flex items-center justify-between gap-3 px-5 py-2.5">
+                <span>{f.fee}</span>
+                <span className="shrink-0">
+                  <Status tone={f.overdue ? "bad" : "warn"}>
+                    {rupees(f.balance)} by {f.due_on}
+                  </Status>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section
+        title="From the school"
+        flush
+        action={
           <Button size="sm" onClick={() => open(null)}>
-            <Phone /> Ask the school
+            <Phone weight="fill" /> Ask the school
           </Button>
-        </div>
-        <div className="mt-3 divide-y">
-          {data.messages.length === 0 && <Empty>No messages yet. You can still ask the school anything.</Empty>}
-          {data.messages.map((m) => {
-            const Icon = ICON[m.kind];
-            return (
-              <button
-                key={m.id}
-                onClick={() => open(m)}
-                className="flex w-full items-center gap-3 py-3 text-left"
-              >
-                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted">
-                  <Icon className="size-4" />
+        }
+      >
+        {data.messages.length === 0 ? (
+          <Nothing icon={<ChatsCircle />} title="No messages yet">
+            You can still ask the school anything.
+          </Nothing>
+        ) : (
+          <ItemGroup className="gap-0 divide-y">
+            {data.messages.map((m) => {
+              const Icon = ICON[m.kind];
+              return (
+                <Item key={m.id} asChild size="sm" className="flex-nowrap rounded-none border-0 px-5">
+                  <button onClick={() => open(m)} className="text-left">
+                    <ItemMedia variant="icon">
+                      <Icon weight="duotone" className="size-5" />
+                    </ItemMedia>
+                    <ItemContent className="min-w-0">
+                      <ItemTitle>
+                        {m.title}
+                        {!m.heard && <span className="size-1.5 rounded-full bg-voice" />}
+                      </ItemTitle>
+                      <ItemDescription className="line-clamp-1">{m.script}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions className="text-xs text-muted-foreground tabular-nums">
+                      {time(m.created_at)}
+                      <CaretRight className="size-3.5" />
+                    </ItemActions>
+                  </button>
+                </Item>
+              );
+            })}
+          </ItemGroup>
+        )}
+      </Section>
+
+      <Section title="Homework" flush>
+        {data.homework.length === 0 ? (
+          <Nothing icon={<BookOpenText />} title="Nothing in the last few days" />
+        ) : (
+          <ul className="divide-y">
+            {data.homework.map((h) => (
+              <li key={h.id} className="px-5 py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <Tag dot={h.subject}>{h.subject}</Tag>
+                  <span className="text-xs text-muted-foreground">Due {day(h.due_date)}</span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    {m.title}
-                    {!m.heard && <span className="size-1.5 rounded-full bg-voice" />}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">{m.script}</div>
-                </div>
-                <span className="text-xs text-muted-foreground tabular-nums">{time(m.created_at)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Panel>
+                <p className="mt-2 text-sm leading-relaxed font-medium">{h.task}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
 
-      <Panel>
-        <div className="text-lg font-semibold tracking-tight">This week</div>
-        <div className="mt-3 flex gap-8">
-          <Stat value={data.attendance.days_present} unit={`/ ${data.attendance.school_days} days`} label="In school" />
-          <Stat value={rupees(due.reduce((n, f) => n + f.balance, 0))} label="Fees due" />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {data.attendance.absent_on.map((d) => (
-            <Chip key={d} tone="bad">
-              Absent {d}
-            </Chip>
-          ))}
-          {data.attendance.late_on.map((d) => (
-            <Chip key={d} tone="warn">
-              Late {d}
-            </Chip>
-          ))}
-          {due.map((f) => (
-            <Chip key={f.fee} tone={f.overdue ? "bad" : "warn"}>
-              {f.fee}: {rupees(f.balance)} by {f.due_on}
-            </Chip>
-          ))}
-        </div>
-      </Panel>
-
-      <Panel>
-        <div className="text-lg font-semibold tracking-tight">Homework</div>
-        <div className="mt-3 space-y-2">
-          {data.homework.length === 0 && <Empty>Nothing given in the last few days.</Empty>}
-          {data.homework.map((h) => (
-            <div key={h.id} className="rounded-xl border p-3">
-              <div className="flex items-center justify-between">
-                <Chip tone="info">{h.subject}</Chip>
-                <span className="text-xs text-muted-foreground">Due {day(h.due_date)}</span>
-              </div>
-              <p className="mt-2 text-sm font-medium">{h.task}</p>
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <p className="pb-4 text-center text-xs text-muted-foreground">
+      <p className="px-4 pt-2 text-center text-xs leading-relaxed text-muted-foreground">
         A demo with made-up data. This page stands in for a real phone call from {data.teacher}&apos;s class.
       </p>
     </div>
+  );
+}
+
+function Line({ mark, label, value }: { mark: "absent" | "late"; label: string; value: string }) {
+  return (
+    <li className="flex items-center gap-3 px-5 py-2.5">
+      <span className={cn("h-4 w-1 rounded-full", MARK_COLOR[mark])} />
+      <span>{label}</span>
+      <span className="ml-auto text-muted-foreground">{value}</span>
+    </li>
   );
 }

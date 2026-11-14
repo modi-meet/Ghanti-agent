@@ -1,9 +1,9 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { BookOpenText, Trash } from "@phosphor-icons/react";
 import useSWR from "swr";
 
-import { Chip, Empty, PageHeader, Panel } from "@/components/bits";
+import { Nothing, PageHeader, Section, Tag } from "@/components/bits";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, fetcher } from "@/lib/api";
@@ -25,46 +25,57 @@ export default function HomeworkPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader title="Homework" hint="Added from Chat. Parents hear it in their own language." />
-      {data?.length === 0 && <Empty>No homework yet. Tell Ghanti what you gave today.</Empty>}
+      {data?.length === 0 && (
+        <Nothing icon={<BookOpenText />} title="No homework yet">
+          Tell Ghanti what you gave today and it shows up here.
+        </Nothing>
+      )}
       {days.map((d) => {
         const items = data!.filter((h) => h.assigned_date === d);
         return (
-          <Panel key={d}>
-            <div className="flex items-baseline justify-between">
-              <div className="text-lg font-semibold tracking-tight">{day(d)}</div>
-              <div className="text-xs text-muted-foreground">
+          <Section
+            key={d}
+            flush
+            title={day(d, { weekday: "long", day: "numeric", month: "long" })}
+            action={
+              <span className="text-xs text-muted-foreground">
                 {items.length} {items.length === 1 ? "subject" : "subjects"}
-              </div>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-36">Subject</TableHead>
-                    <TableHead>Task</TableHead>
-                    <TableHead className="w-28">Due</TableHead>
-                    <TableHead className="w-10" />
+              </span>
+            }
+          >
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-40 pl-5">Subject</TableHead>
+                  <TableHead>Task</TableHead>
+                  <TableHead className="w-32">Due</TableHead>
+                  <TableHead className="w-12 pr-3" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((h) => (
+                  <TableRow key={h.id} className="group">
+                    <TableCell className="pl-5">
+                      <Tag dot={h.subject}>{h.subject}</Tag>
+                    </TableCell>
+                    <TableCell className="py-3 font-medium whitespace-normal">{h.task}</TableCell>
+                    <TableCell className="text-muted-foreground">{day(h.due_date)}</TableCell>
+                    <TableCell className="pr-3">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Delete"
+                        className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        onClick={() => remove(h.id)}
+                      >
+                        <Trash />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((h) => (
-                    <TableRow key={h.id}>
-                      <TableCell>
-                        <Chip tone="info">{h.subject}</Chip>
-                      </TableCell>
-                      <TableCell className="font-medium whitespace-normal">{h.task}</TableCell>
-                      <TableCell className="text-muted-foreground">{day(h.due_date)}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon-sm" aria-label="Delete" onClick={() => remove(h.id)}>
-                          <Trash2 />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Panel>
+                ))}
+              </TableBody>
+            </Table>
+          </Section>
         );
       })}
     </div>

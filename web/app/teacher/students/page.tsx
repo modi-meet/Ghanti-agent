@@ -1,12 +1,14 @@
 "use client";
 
-import { Eye, EyeOff, Trash2 } from "lucide-react";
+import { Eye, EyeSlash, Trash } from "@phosphor-icons/react";
 import useSWR from "swr";
 
-import { Chip, PageHeader, Panel } from "@/components/bits";
+import { type Mark, PageHeader, Person, Section, Status, WeekBars } from "@/components/bits";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api, fetcher, LANGUAGES } from "@/lib/api";
-import { initials, rupees } from "@/lib/format";
+import { rupees } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type Note = { id: number; text: string; private: boolean };
 type Student = {
@@ -15,7 +17,7 @@ type Student = {
   roll_no: number;
   parent: string;
   parent_language: string;
-  absent_7d: number;
+  week: { date: string; mark: Mark }[];
   fee_balance: number;
   notes: Note[];
 };
@@ -33,53 +35,66 @@ export default function StudentsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Students"
         hint="Your notes are what Ghanti draws on when a parent asks how their child is doing."
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        {data?.map((s) => (
-          <Panel key={s.id}>
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-xl bg-muted text-sm font-semibold">
-                {initials(s.name)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold tracking-tight">{s.name}</div>
-                <div className="truncate text-xs text-muted-foreground">
-                  Roll {s.roll_no} · {s.parent} · {LANGUAGES[s.parent_language] ?? s.parent_language}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {data?.map((s) => {
+          const absent = s.week.filter((d) => d.mark === "absent").length;
+          return (
+            <Section key={s.id} flush>
+              <div className="flex items-center gap-3 px-5 py-4">
+                <Person name={s.name} size="lg" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold tracking-tight">{s.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    Roll {s.roll_no} · {s.parent} · {LANGUAGES[s.parent_language] ?? s.parent_language}
+                  </div>
                 </div>
+                <WeekBars week={s.week} />
               </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Chip tone={s.absent_7d >= 3 ? "bad" : s.absent_7d ? "warn" : "good"}>
-                {s.absent_7d ? `${s.absent_7d} absent this week` : "Full attendance"}
-              </Chip>
-              {s.fee_balance > 0 && <Chip tone="warn">{rupees(s.fee_balance)} due</Chip>}
-            </div>
-            <div className="mt-4 space-y-2">
-              {s.notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-              {s.notes.map((n) => (
-                <div key={n.id} className="group flex items-start gap-2 rounded-xl border p-2.5">
-                  <p className="flex-1 text-sm">{n.text}</p>
-                  {n.private && <Chip>Private</Chip>}
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => setPrivate(n)}
-                    title={n.private ? "Private. Click to let parents hear it." : "Parents can hear this. Click to make it private."}
-                  >
-                    {n.private ? <EyeOff /> : <Eye />}
-                  </Button>
-                  <Button variant="ghost" size="icon-xs" onClick={() => remove(n)} title="Delete note">
-                    <Trash2 />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        ))}
+
+              <div className="flex flex-wrap gap-1.5 border-t px-5 py-3">
+                <Status tone={absent >= 3 ? "bad" : absent ? "warn" : "good"}>
+                  {absent ? `${absent} absent this week` : "Full attendance"}
+                </Status>
+                <Status tone={s.fee_balance > 0 ? "warn" : "good"}>
+                  {s.fee_balance > 0 ? `${rupees(s.fee_balance)} due` : "Fees paid"}
+                </Status>
+              </div>
+
+              <ul className="divide-y border-t">
+                {s.notes.length === 0 && <li className="px-5 py-3 text-sm text-muted-foreground">No notes yet.</li>}
+                {s.notes.map((n) => (
+                  <li key={n.id} className="group flex items-start gap-2 py-3 pr-3 pl-5">
+                    <p className={cn("flex-1 text-sm leading-relaxed", n.private && "text-muted-foreground")}>{n.text}</p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon-xs" className="text-muted-foreground" onClick={() => setPrivate(n)}>
+                          {n.private ? <EyeSlash weight="fill" /> : <Eye />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {n.private ? "Private. Click to let parents hear it." : "Parents can hear this. Click to make it private."}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Delete note"
+                      className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                      onClick={() => remove(n)}
+                    >
+                      <Trash />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          );
+        })}
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full bg-muted">
+      <body className="min-h-full bg-shell">
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster position="top-center" />
       </body>

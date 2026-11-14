@@ -111,17 +111,20 @@ def confirm_action(action_id: int, user: User = Depends(teacher_user), db: Sessi
 
 @router.get("/overview")
 def overview(user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+    """Today at a glance. The Chat tab shows this next to the conversation."""
     today = config.today()
-    students = _students(db, user)
-    ids = [s.id for s in students]
+    students = {s.id: s for s in _students(db, user)}
     class_ids = [c.id for c in _classes(db, user)]
+    marks = db.query(Attendance).filter(Attendance.student_id.in_(students), Attendance.date == today).all()
+    homework = db.query(Homework).filter(Homework.class_id.in_(class_ids), Homework.assigned_date == today).all()
+    fees = db.query(Fee).filter(Fee.student_id.in_(students), Fee.amount_paid < Fee.amount_due).all()
     return {
         "teacher": user.name, "classes": [c.name for c in _classes(db, user)], "students": len(students),
-        "absent_today": db.query(Attendance).filter(Attendance.student_id.in_(ids), Attendance.date == today,
-                                                    Attendance.status == "absent").count(),
-        "homework_today": db.query(Homework).filter(Homework.class_id.in_(class_ids),
-                                                    Homework.assigned_date == today).count(),
-        "fees_pending": db.query(Fee).filter(Fee.student_id.in_(ids), Fee.amount_paid < Fee.amount_due).count(),
+        "absent": [students[m.student_id].name for m in marks if m.status == "absent"],
+        "late": [students[m.student_id].name for m in marks if m.status == "late"],
+        "homework": [{"subject": h.subject, "task": h.task} for h in homework],
+        "fees_pending": {"count": len({f.student_id for f in fees}),
+                         "amount": sum(f.amount_due - f.amount_paid for f in fees)},
         "inbox_open": db.query(InboxItem).filter_by(teacher_id=user.id, status="open").count(),
     }
 
@@ -183,16 +186,18 @@ def set_attendance(body: Mark, user: User = Depends(teacher_user), db: Session =
 
 @router.get("/students")
 def list_students(user: User = Depends(teacher_user), db: Session = Depends(get_db)):
-    week_ago = config.today() - timedelta(days=6)
+    today = config.today()
+    days = school_days(today - timedelta(days=9), today)[-6:]
     out = []
     for s in _students(db, user):
         notes = db.query(Note).filter_by(student_id=s.id).order_by(Note.created_at.desc()).all()
         fees = db.query(Fee).filter_by(student_id=s.id).all()
+        rows = db.query(Attendance).filter(Attendance.student_id == s.id, Attendance.date >= days[0]).all()
+        marks = {r.date: r.status for r in rows}
         out.append({
             "id": s.id, "name": s.name, "roll_no": s.roll_no, "class": s.school_class.name,
             "parent": s.parent.name, "parent_language": s.parent.language,
-            "absent_7d": db.query(Attendance).filter(Attendance.student_id == s.id, Attendance.date >= week_ago,
-                                                     Attendance.status == "absent").count(),
+            "week": [{"date": d.isoformat(), "mark": marks.get(d, "present")} for d in days],
             "fee_balance": sum(f.amount_due - f.amount_paid for f in fees),
             "notes": [{"id": n.id, "text": n.text, "private": n.private,
                        "created_at": iso(n.created_at)} for n in notes],

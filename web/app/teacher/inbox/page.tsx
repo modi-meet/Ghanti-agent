@@ -1,11 +1,11 @@
 "use client";
 
-import { CornerDownRight, PhoneCall } from "lucide-react";
+import { ArrowBendDownRight, Tray } from "@phosphor-icons/react";
 import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import { Chip, Empty, PageHeader, Panel } from "@/components/bits";
+import { Nothing, PageHeader, Person, Section, Status } from "@/components/bits";
 import { Composer, type Said } from "@/components/composer";
 import { fetcher, say } from "@/lib/api";
 import { day, time } from "@/lib/format";
@@ -43,39 +43,56 @@ export default function InboxPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title="Inbox" hint="What parents asked that the records couldn't answer, and a line on every call." />
-      {data?.length === 0 && <Empty>Nothing from parents yet. It shows up here after they talk to Ghanti.</Empty>}
+      {data?.length === 0 && (
+        <Nothing icon={<Tray />} title="Nothing from parents yet">
+          Questions and call summaries land here after parents talk to Ghanti.
+        </Nothing>
+      )}
       {data?.map((item) => (
-        <Panel key={item.id}>
-          <div className="flex items-center gap-2">
-            <div className="font-semibold tracking-tight">{item.parent}</div>
-            <span className="text-xs text-muted-foreground">parent of {item.student}</span>
-            <div className="ml-auto flex items-center gap-2">
-              {item.kind === "summary" ? (
-                <Chip>
-                  <PhoneCall className="mr-1 size-3" /> Call summary
-                </Chip>
-              ) : (
-                <Chip tone={item.status === "open" ? "warn" : "good"}>{item.status === "open" ? "Needs a reply" : "Answered"}</Chip>
-              )}
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {day(item.created_at, { day: "numeric", month: "short" })}, {time(item.created_at)}
-              </span>
+        <Section key={item.id} flush>
+          <div className="flex items-center gap-3 px-5 py-4">
+            <Person name={item.parent} size="lg" />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold tracking-tight">{item.parent}</div>
+              <div className="text-xs text-muted-foreground">
+                Parent of {item.student} · {day(item.created_at, { day: "numeric", month: "short" })}, {time(item.created_at)}
+              </div>
             </div>
+            {item.kind === "summary" ? (
+              <Status>Call summary</Status>
+            ) : (
+              <Status tone={item.status === "open" ? "warn" : "good"}>
+                {item.status === "open" ? "Needs a reply" : "Answered"}
+              </Status>
+            )}
           </div>
-          <p className="mt-3 text-sm">{item.text}</p>
-          {item.original && <p className="mt-1 text-xs text-muted-foreground">In their words: “{item.original}”</p>}
-          {item.reply && (
-            <p className="mt-3 flex gap-2 rounded-xl border bg-muted/50 p-2.5 text-sm">
-              <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              {item.reply}
-            </p>
-          )}
+
+          <div className="space-y-3 border-t px-5 py-4">
+            <p className="text-sm leading-relaxed">{item.text}</p>
+            {item.original && (
+              <blockquote className="border-l-2 pl-3 text-sm text-muted-foreground">{item.original}</blockquote>
+            )}
+            {item.reply && (
+              <p className="flex gap-2 text-sm">
+                <ArrowBendDownRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="text-muted-foreground">You said: </span>
+                  {item.reply}
+                </span>
+              </p>
+            )}
+          </div>
+
           {item.kind === "question" && item.status === "open" && (
-            <div className="mt-4">
-              <Composer busy={busy === item.id} placeholder="Hold the mic to answer, or type" onSend={(s) => reply(item, s)} />
+            <div className="border-t bg-muted/40 p-3">
+              <Composer
+                busy={busy === item.id}
+                placeholder={`Answer ${item.parent.split(" ")[0]}, by voice or text`}
+                onSend={(s) => reply(item, s)}
+              />
             </div>
           )}
-        </Panel>
+        </Section>
       ))}
     </div>
   );

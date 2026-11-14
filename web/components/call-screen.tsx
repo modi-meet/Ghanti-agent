@@ -1,13 +1,11 @@
 "use client";
 
-import { BellRing, Phone, PhoneOff, SendHorizontal } from "lucide-react";
+import { ArrowUp, BellRinging, Phone, PhoneDisconnect } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 
 import { MicButton } from "@/components/mic-button";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { api, say, type Exchange, type Turn } from "@/lib/api";
 import { play, stop, unlock, usePlaying } from "@/lib/player";
 import { cn } from "@/lib/utils";
@@ -97,42 +95,47 @@ export function CallScreen({
     onClose();
   }
 
-  const status = busy ? "Thinking…" : speaking ? "Speaking…" : callId ? "Hold the button and ask anything" : "Connecting…";
+  const status = busy ? "Thinking" : speaking ? "Speaking" : callId ? "Listening" : "Connecting";
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-50">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden px-5 pt-10 pb-6">
+    <div className="fixed inset-0 z-50 flex flex-col bg-stone-950 text-stone-50">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden px-5 pt-12 pb-6">
         <div className="flex flex-col items-center text-center">
           <div className="relative grid size-20 place-items-center rounded-full bg-voice text-voice-foreground">
-            {(stage === "ringing" || speaking) && (
-              <span className="absolute inset-0 animate-ping rounded-full bg-voice/40" />
-            )}
-            <BellRing className={cn("relative size-8", stage === "ringing" && "animate-bounce")} />
+            {stage === "ringing" && <span className="absolute -inset-2 animate-ping rounded-full border-2 border-voice/60" />}
+            <BellRinging weight="fill" className={cn("size-9", stage === "ringing" && "animate-bounce")} />
           </div>
-          <div className="mt-4 text-xl font-semibold tracking-tight">{caller}</div>
-          <div className="mt-1 text-sm text-neutral-400">
-            {stage === "ringing" ? (message?.title ?? "Incoming call") : status}
+          <div className="mt-5 text-xl font-semibold tracking-tight">{caller}</div>
+          <div className="mt-1.5 flex h-5 items-center gap-2 text-sm text-stone-400">
+            {stage === "ringing" ? (
+              (message?.title ?? "Incoming call")
+            ) : (
+              <>
+                {speaking && <Wave />}
+                {status}
+              </>
+            )}
           </div>
         </div>
 
         {stage === "ringing" ? (
-          <div className="mt-auto flex items-center justify-around pb-6">
+          <div className="mt-auto flex items-center justify-around pb-8">
             <RoundButton label="Later" onClick={onClose} className="bg-red-600">
-              <PhoneOff className="size-6" />
+              <PhoneDisconnect weight="fill" className="size-7" />
             </RoundButton>
             <RoundButton label="Answer" onClick={pickUp} className="bg-emerald-600">
-              <Phone className="size-6" />
+              <Phone weight="fill" className="size-7" />
             </RoundButton>
           </div>
         ) : (
           <>
-            <div className="mt-8 flex-1 space-y-3 overflow-y-auto pr-1">
+            <div className="mt-8 flex-1 space-y-3 overflow-y-auto">
               {turns.map((t) => (
                 <div key={t.id} className={cn("flex", t.role === "user" && "justify-end")}>
                   <p
                     className={cn(
-                      "max-w-[88%] rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed",
-                      t.role === "user" ? "rounded-br-md bg-neutral-50 text-neutral-900" : "rounded-bl-md bg-neutral-800",
+                      "max-w-[86%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed",
+                      t.role === "user" ? "rounded-br-md bg-stone-50 text-stone-900" : "rounded-bl-md bg-stone-800/80",
                     )}
                   >
                     {t.text}
@@ -142,19 +145,21 @@ export function CallScreen({
               <div ref={bottom} />
             </div>
 
-            <div className="mt-4 grid grid-cols-3 items-end">
+            <div className="mt-5 grid grid-cols-3 items-center">
               <div />
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
                 <MicButton large busy={busy || !callId} onClip={(audio) => send({ audio })} />
+                <span className="text-xs text-stone-400">Hold to talk</span>
               </div>
               <div className="flex justify-end">
                 <RoundButton label="End" onClick={hangUp} className="size-12 bg-red-600">
-                  <PhoneOff className="size-5" />
+                  <PhoneDisconnect weight="fill" className="size-5" />
                 </RoundButton>
               </div>
             </div>
+
             <form
-              className="mt-5 flex items-center gap-2"
+              className="mt-5 flex h-11 items-center gap-1.5 rounded-full border border-stone-800 bg-stone-900 pr-1.5 pl-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!text.trim() || busy) return;
@@ -162,15 +167,20 @@ export function CallScreen({
                 setText("");
               }}
             >
-              <Input
+              <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="or type your question"
-                className="h-10 rounded-xl border-neutral-700 bg-neutral-900 text-neutral-50 placeholder:text-neutral-500"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-stone-500"
               />
-              <Button type="submit" size="icon-lg" variant="secondary" disabled={busy || !text.trim()} aria-label="Send">
-                <SendHorizontal />
-              </Button>
+              <button
+                type="submit"
+                disabled={busy || !text.trim()}
+                aria-label="Send"
+                className="grid size-8 place-items-center rounded-full bg-stone-50 text-stone-900 disabled:bg-stone-800 disabled:text-stone-500"
+              >
+                <ArrowUp weight="bold" className="size-4" />
+              </button>
             </form>
           </>
         )}
@@ -179,14 +189,24 @@ export function CallScreen({
   );
 }
 
-function RoundButton({
-  label,
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"button"> & { label: string }) {
+// Three bars that move while the school is speaking.
+function Wave() {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <span className="flex h-3.5 items-end gap-0.5">
+      {[0, 150, 300].map((delay) => (
+        <span
+          key={delay}
+          className="w-0.5 origin-bottom animate-pulse rounded-full bg-voice"
+          style={{ height: "100%", animationDelay: `${delay}ms`, animationDuration: "700ms" }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function RoundButton({ label, className, children, ...props }: React.ComponentProps<"button"> & { label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2">
       <button
         type="button"
         aria-label={label}
@@ -195,7 +215,7 @@ function RoundButton({
       >
         {children}
       </button>
-      <span className="text-xs text-neutral-400">{label}</span>
+      <span className="text-xs text-stone-400">{label}</span>
     </div>
   );
 }

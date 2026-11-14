@@ -2,10 +2,12 @@
 
 import useSWR from "swr";
 
-import { Chip, PageHeader, Panel, Stat } from "@/components/bits";
+import { PageHeader, Person, Section, Stat, Status } from "@/components/bits";
+import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetcher } from "@/lib/api";
 import { day, rupees } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type Fee = {
   id: number;
@@ -27,41 +29,66 @@ export default function FeesPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader title="Fees" hint="Record a payment by telling Ghanti. It asks you to confirm before saving." />
-      <Panel>
-        <div className="flex gap-10">
-          <Stat value={rupees(total("amount_paid"))} label="Collected" />
-          <Stat value={rupees(total("balance"))} label="Still to come" />
-          <Stat value={data?.filter((f) => f.status === "overdue").length ?? "–"} label="Overdue" />
+
+      <Section flush>
+        <div className="grid grid-cols-3 divide-x">
+          <div className="px-5 py-4">
+            <Stat value={rupees(total("amount_paid"))} label="Collected" />
+          </div>
+          <div className="px-5 py-4">
+            <Stat value={rupees(total("balance"))} label="Still to come" />
+          </div>
+          <div className="px-5 py-4">
+            <Stat value={data?.filter((f) => f.status === "overdue").length ?? "–"} unit="families" label="Overdue" />
+          </div>
         </div>
-        <div className="mt-5 overflow-hidden rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Fee</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead>Status</TableHead>
+      </Section>
+
+      <Section flush title="This term">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-5">Student</TableHead>
+              <TableHead>Fee</TableHead>
+              <TableHead className="w-52">Paid</TableHead>
+              <TableHead className="w-24">Due</TableHead>
+              <TableHead className="w-28 pr-5">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data?.map((f) => (
+              <TableRow key={f.id}>
+                <TableCell className="py-2.5 pl-5">
+                  <div className="flex items-center gap-3">
+                    <Person name={f.student} />
+                    <span className="font-medium">{f.student}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">{f.title}</TableCell>
+                <TableCell>
+                  <div className="mb-1.5 text-xs tabular-nums">
+                    <span className="font-medium">{rupees(f.amount_paid)}</span>
+                    <span className="text-muted-foreground"> of {rupees(f.amount_due)}</span>
+                  </div>
+                  <Progress
+                    value={(f.amount_paid / f.amount_due) * 100}
+                    className={cn(
+                      "h-1.5",
+                      f.status === "paid" ? "*:data-[slot=progress-indicator]:bg-emerald-500" : "*:data-[slot=progress-indicator]:bg-amber-500",
+                    )}
+                  />
+                </TableCell>
+                <TableCell className="text-muted-foreground tabular-nums">
+                  {day(f.due_date, { day: "numeric", month: "short" })}
+                </TableCell>
+                <TableCell className="pr-5 capitalize">
+                  <Status tone={TONE[f.status]}>{f.status}</Status>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data?.map((f) => (
-                <TableRow key={f.id}>
-                  <TableCell className="font-medium">{f.student}</TableCell>
-                  <TableCell className="text-muted-foreground">{f.title}</TableCell>
-                  <TableCell className="text-right tabular-nums">{rupees(f.amount_paid)}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{rupees(f.balance)}</TableCell>
-                  <TableCell className="text-muted-foreground">{day(f.due_date, { day: "numeric", month: "short" })}</TableCell>
-                  <TableCell>
-                    <Chip tone={TONE[f.status]}>{f.status}</Chip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Panel>
+            ))}
+          </TableBody>
+        </Table>
+      </Section>
     </div>
   );
 }
