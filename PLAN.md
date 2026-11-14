@@ -1,7 +1,7 @@
 # PLAN
 
 Ghanti: a school voice agent. The teacher runs the class by talking, parents
-get reports and ask questions in their own language. Waiting on approval.
+get reports and ask questions in their own language.
 
 ## What it does
 
@@ -32,79 +32,73 @@ final text -> Timbre -> audio
 
 The base prompt holds only persona, tone and guardrails. Data comes from tools.
 
-| Teacher tools (write) | Parent tools (read only) |
+| Teacher tools | Parent tools (read only) |
 |---|---|
-| `find_student(name, class)` | `get_attendance(days)` |
-| `add_homework(class, subject, task, due)` | `get_homework(from, to, subject?)` |
-| `mark_attendance(students, date, status)` | `get_fee_status()` |
-| `add_student_note(student, note, private)` | `get_teacher_notes(topic?)` |
-| `update_fee(student, amount, status)` | `ask_teacher(question)` |
-| `get_class_summary(class, days)` | |
+| `find_student(name, class_name?)` | `get_attendance(days)` |
+| `add_homework(class_name, subject, task, due_date)` | `get_homework(from_date, to_date, subject?)` |
+| `mark_attendance(student_ids, status, date)` | `get_fee_status()` |
+| `add_student_note(student_id, note, private)` | `get_teacher_notes()` |
+| `update_fee(student_id, kind, amount)` | `ask_teacher(question, parent_words)` |
+| `get_class_summary(class_name, days)` | |
+| `get_student_record(student_id, days)` | |
 
 Guardrails that live in code, not in the prompt:
 
 - Parent tools never take a student id. The server fills it in from the login, so one parent can't reach another child's data.
 - `get_teacher_notes` never returns notes marked private.
-- Speech mishears names. `find_student` fuzzy-matches the roster, and the agent asks back when two students match.
+- Speech mishears names. Roster names go to Prisma as key terms, `find_student` fuzzy-matches, and the agent asks back when two students match.
 - Every teacher action shows a receipt card with undo. Fee changes need a tap to confirm.
-- Each tool call is logged (name, args, time taken) and shown in a small trace under the reply.
+- Each tool call is logged (name, args, time taken) and shown under the reply.
 
 ## Stack
 
 ```
-web/   Next.js + Tailwind + shadcn/ui   -> Vercel
-api/   FastAPI (Python)                 -> Vercel, second project, Mumbai region
-       Neon Postgres, Vercel Blob for cached audio, Vercel Cron
+web/   Next.js 16 + Tailwind + shadcn/ui   -> Vercel
+api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Mumbai region
+       Postgres (Neon) when deployed, a SQLite file locally
 ```
 
+- The browser only talks to `web`. It proxies `/api/*` to FastAPI, so cookies are same-origin and there's no CORS.
 - UI follows `ui:ux-guide.md`: sidebar layout, Inter, hairline borders, nested radii, compact controls.
-- Logins: seeded teacher and parent accounts, cookie sessions, one-click demo login.
-- Speech: Prisma and Timbre over REST, server side only. Browser records WAV, clips under 30s.
-- LLM: Gemini with function calling, behind a gateway. Evon speaks the OpenAI-style API under vLLM, so it's one adapter away if a GPU turns up (see blockers).
-- Tables: users, classes, students, attendance, homework, fees, notes, messages, turns, tool_calls, teacher_inbox.
-- Seed: one teacher, class 8B with eight students, three parents (Hindi, Kannada, one more). All synthetic.
+- Logins: seeded demo accounts picked from a list, signed cookie session. No passwords, the data is all synthetic.
+- Speech: Prisma v3.0 and Timbre v2.5 over REST, server side only. The browser records 16 kHz WAV, clips under 30s.
+- Spoken audio is stored in the database keyed by a hash of the text, made on first play. No blob store needed.
+- LLM: Gemini with function calling, behind a gateway. Evon under vLLM would be one more adapter.
+- Seed: one teacher, class 8B with eight students (two are called Rohan on purpose), parents in Hindi, Gujarati and English.
 
 ## Spending credits carefully
 
-- One Gnani API key for everything (the free account allows three).
-- A mock speech adapter is the default in dev: canned transcripts in, a saved clip out. Building the UI and the agent costs zero credits. The chat box also takes typed text.
-- Real calls only for: the first smoke test (about 6 short calls), one end-to-end pass, and the demo.
-- Every Timbre result is cached by text + voice + language. Nothing is spoken twice.
-- Per-user daily cap on voice turns once deployed.
-- I report credits used after the smoke test, before spending more.
+- One Gnani API key for everything.
+- `SPEECH_MODE=mock` is the default: a beep out, a canned line in, zero credits. Every screen also takes typed text.
+- Every Timbre result is cached. Nothing is spoken twice.
+- Real speech is capped per user and per day (`VOICE_CAP_PER_USER`, `VOICE_CAP_TOTAL`).
+- Used so far: 5 calls in the smoke test (3 Timbre, 2 Prisma).
 
-## Build order
+## Where it stands
 
-1. Smoke test Prisma and Timbre in Hindi and Kannada. Note cost per call and available voices.
-2. Scaffold both apps, schema, seed data, logins, app shell from the UI guide.
-3. Agent core: gateway, tool registry, dispatcher, trace. Tested with typed text and mock speech.
-4. Teacher: Chat tab with write tools, plus the read/edit tabs.
-5. Parent: inbox, daily message, weekly call screen, question loop with read tools.
-6. Teacher inbox: call summaries, open questions, reply to parent.
-7. Cron for daily and weekly sends, a "send now" button, limits.
-8. Deploy both projects, test on a phone, then NON_TECH.md.
+Done and checked:
 
-## Blockers
+- [x] Smoke test in Hindi and Gujarati (results in [API.md](API.md))
+- [x] Backend: schema, seed, logins, agent loop, both tool sets, undo/confirm, reports, inbox, cron endpoint
+- [x] 10 backend tests pass (loop, tools, guardrails) using a scripted LLM
+- [x] Frontend: login, teacher Chat and five tabs, parent portal, call screen
+- [x] Clicked through in a browser in mock mode, with a scripted agent turn
 
-Need from you:
+Not done:
 
-- Gnani API key in `api/.env`. Nothing speech-related runs without it.
-- Gemini API key, or a decision on Evon.
-- `vercel login` on this machine, and a yes to the Neon and Blob add-ons.
+- [ ] One real agent turn. **The Gemini key in `api/.env` is rejected as invalid**, so the live LLM path has never run.
+- [ ] One full pass with `SPEECH_MODE=gnani` (mic to Prisma to agent to Timbre)
+- [ ] Deploy: Vercel login, Neon database, env vars, Vercel config for FastAPI and the daily cron
+- [ ] Test on a real phone
 
-Evon, if we host it: 63.5 GB of weights, the model card lists H100/H200/A100
-GPUs, and no hosted provider serves it. That's a rented GPU at a few dollars an
-hour for as long as the app is live. The card also says multi-step tool use is
-still being worked on, and tool use is this whole product.
+## Risks to check at deploy
 
-Vercel limits, already designed around:
+- Vercel has no WebSockets and no ffmpeg. Both are designed around (REST clips, WAV from the browser).
+- Vercel function time limit. The weekly call writes one script per child in a single request, eight Gemini calls in a row. Fine locally, needs checking on the plan's limit.
+- Hobby cron runs once a day, which is all this needs.
+- The Gnani free account allows one request at a time. Calls retry on 429, but two parents talking at once will feel it.
 
-- No WebSockets, so hold-to-talk over REST instead of live streaming.
-- No ffmpeg, so the browser records WAV.
-- Function time limits, so audio is made per parent on first play, never a whole class in one run. Exact limit on the plan still to check.
-- Hobby cron runs once a day, which is enough.
+## Rules
 
-Rules:
-
-- The post says plainly that the website stands in for the phone call.
+- The site says plainly that it stands in for the phone call. The post should too.
 - Deadline 15 Nov 2026, 18:00 IST, post live before the form.

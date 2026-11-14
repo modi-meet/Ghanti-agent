@@ -38,11 +38,11 @@ The non-tech side (video, post, form) lives in [NON_TECH.md](NON_TECH.md).
 
 ## Build checklist
 
-- [ ] Register on the form, get the credits email
-- [ ] Generate an API key at app.gnani.ai/voice
-- [ ] Smoke test STT and TTS with curl (see [API.md](API.md))
-- [ ] Pick an idea from [IDEAS.md](IDEAS.md)
-- [ ] Build the core voice loop end to end
-- [ ] Seed synthetic demo data
+- [x] Register on the form, get the credits email
+- [x] Generate an API key at app.gnani.ai/voice
+- [x] Smoke test STT and TTS with curl (see [API.md](API.md))
+- [x] Pick an idea: Ghanti, see [PLAN.md](PLAN.md)
+- [x] Build the app and seed synthetic demo data
+- [ ] Run the voice loop end to end with real keys
 - [ ] Deploy
 - [ ] Hand over to NON_TECH.md

@@ -1,7 +1,7 @@
 # IDEAS
 
-Round two. Bigger ideas, each one growing out of something I've already
-shipped, picked for the prizes rather than for build time. Nothing is built yet.
+The ideas we weighed before building. We went with Ghanti (number 2), reshaped
+into a website with a teacher chat and a parent call screen. See [PLAN.md](PLAN.md).
 
 ## How the prizes steer this
 
