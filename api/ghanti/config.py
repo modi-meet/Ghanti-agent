@@ -29,6 +29,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODELS = [m.strip() for m in os.getenv(
     "GEMINI_MODELS", "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash").split(",") if m.strip()]
 
+# "single" is one LLM request per turn with the records in the prompt. "tools" is the full
+# tool-calling loop, which needs a quota the free tier doesn't have. See agent/loop.py.
+AGENT_MODE = os.getenv("AGENT_MODE", "single")
+
 # "mock" costs no Gnani credits. Switch to "gnani" for the real thing.
 SPEECH_MODE = os.getenv("SPEECH_MODE", "mock")
 

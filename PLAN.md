@@ -32,6 +32,22 @@ final text -> Timbre -> audio
 
 The base prompt holds only persona, tone and guardrails. Data comes from tools.
 
+That loop is the design, and it's `AGENT_MODE=tools`. What runs by default is
+`AGENT_MODE=single`, because of the free Gemini quota: a tool loop is two or
+more requests per turn, and at 15 a minute it kept getting rate limited.
+
+```
+single: audio -> Prisma -> [system prompt + records + history] -> LLM, once
+        -> JSON {say, calls} -> dispatcher runs the write calls -> Timbre
+```
+
+In single mode the read tools run up front and their results go into the
+prompt. The model answers with what to say and which write tools to call, and
+the same dispatcher validates and runs them. If a call fails, the harness says
+the problem instead of the model's words. One request per turn, about 1.5
+seconds, same tools and guardrails. It won't scale to a big school the way the
+tool loop does, since every turn carries the records, which is the trade.
+
 | Teacher tools | Parent tools (read only) |
 |---|---|
 | `add_homework(class_name, subject, task, due_date)` | `get_attendance(days)` |
@@ -84,10 +100,10 @@ Done and checked:
 
 - [x] Smoke test in Hindi and Gujarati (results in [API.md](API.md))
 - [x] Backend: schema, seed, logins, agent loop, both tool sets, undo/confirm, reports, inbox, cron endpoint
-- [x] 13 backend tests pass (loop, tools, guardrails) using a scripted LLM
+- [x] 17 backend tests pass (both modes, tools, guardrails) using a scripted LLM
 - [x] Frontend on shadcn/ui: login, teacher Chat and five tabs, parent portal, call screen
-- [x] Real Gemini, teacher side: seven instructions in English and Hinglish, each right in one tool round, 2 to 3 seconds
-- [x] Real Gemini, parent side: weekly call and homework message written in Gujarati and Hindi, questions answered from tools, private note not leaked, other students refused, question passed to the teacher's inbox
+- [x] Real Gemini, teacher side, both modes: seven instructions in English and Hinglish, all right. 2 to 3 seconds in tools mode, about 1.5 in single mode
+- [x] Real Gemini, parent side, both modes: weekly call and homework message written in Gujarati and Hindi, questions answered from tools, private note not leaked, other students refused, question passed to the teacher's inbox
 - [x] Real voice loop once: Gujarati audio in, Prisma, agent with two tools, Timbre audio out, about 6 seconds end to end
 
 Not done:

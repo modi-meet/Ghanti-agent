@@ -43,10 +43,10 @@ def _student(ctx: ToolContext, name: str) -> Student:
     if len(matches) == 1:
         return matches[0]
     if matches:
-        raise ToolError(f"More than one student matches '{name}': {', '.join(s.name for s in matches)}. "
-                        "Nothing was changed. Ask the teacher which one they mean.")
-    raise ToolError(f"No student called '{name}'. Nothing was changed. The name may have been misheard. "
-                    f"Class roster: {', '.join(s.name for s in students)}.")
+        raise ToolError(f"More than one student matches '{name}': {' or '.join(s.name for s in matches)}. "
+                        "Which one did you mean? Nothing was changed for them.")
+    raise ToolError(f"I couldn't find a student called '{name}', so nothing was changed for them. "
+                    f"The class has: {', '.join(s.name for s in students)}.")
 
 
 def _record(ctx: ToolContext, kind: str, title: str, lines: list[str], payload: dict, status="applied") -> Action:
@@ -142,9 +142,14 @@ def get_class_summary(ctx: ToolContext, args: dict) -> dict:
     ids = [s.id for s in students]
     names = {s.id: s.name for s in students}
     rows = ctx.db.query(Attendance).filter(Attendance.student_id.in_(ids), Attendance.date >= start).all()
-    absences: dict[str, list[str]] = {}
+    # Counted here, so the model reads a number instead of adding up dates.
+    by_student: dict[int, dict] = {}
     for r in sorted(rows, key=lambda r: r.date):
-        absences.setdefault(names[r.student_id], []).append(f"{r.date.isoformat()} {r.status}")
+        entry = by_student.setdefault(r.student_id, {"student": names[r.student_id], "days_absent": 0,
+                                                     "days_late": 0, "dates": []})
+        entry["days_absent" if r.status == "absent" else "days_late"] += 1
+        entry["dates"].append(f"{r.date.strftime('%a %d %b')} {r.status}")
+    absences = sorted(by_student.values(), key=lambda e: -e["days_absent"])
     fees = ctx.db.query(Fee).filter(Fee.student_id.in_(ids), Fee.amount_paid < Fee.amount_due).all()
     homework = ctx.db.query(Homework).filter(Homework.class_id == cls.id, Homework.assigned_date >= start).all()
     return {
@@ -175,6 +180,16 @@ def get_student_record(ctx: ToolContext, args: dict) -> dict:
 _STUDENT = {"type": "string", "description": "Student's name in English letters, as full as the teacher gave it."}
 _DATE = "YYYY-MM-DD."
 
+def records(ctx: ToolContext) -> dict:
+    """What the read tools would fetch, gathered up front for single mode."""
+    out = {}
+    for cls in _classes(ctx):
+        roster = ctx.db.query(Student).filter_by(class_id=cls.id).order_by(Student.roll_no).all()
+        out[f"class {cls.name}"] = {"roster": [s.name for s in roster],
+                                    "last_7_days": get_class_summary(ctx, {"class_name": cls.name, "days": 7})}
+    return out
+
+
 TEACHER_TOOLS = Registry([
     Tool("add_homework",
          "Save one homework entry for a class. Call once per subject.",
@@ -183,7 +198,7 @@ TEACHER_TOOLS = Registry([
              "subject": {"type": "string"},
              "task": {"type": "string", "description": "What to do, in the teacher's words, cleaned up."},
              "due_date": {"type": "string", "description": _DATE + " Defaults to the next school day."}},
-          "required": ["subject", "task"]}, add_homework),
+          "required": ["subject", "task"]}, add_homework, writes=True),
     Tool("mark_attendance",
          "Mark students absent, late or present for a day. Students with no mark count as present. "
          "If a name matches more than one student, nothing is saved and the error lists them.",
@@ -192,7 +207,7 @@ TEACHER_TOOLS = Registry([
                           "description": "Names in English letters, as full as the teacher gave them."},
              "status": {"type": "string", "enum": ["absent", "late", "present"]},
              "date": {"type": "string", "description": _DATE + " Defaults to today."}},
-          "required": ["students", "status"]}, mark_attendance),
+          "required": ["students", "status"]}, mark_attendance, writes=True),
     Tool("add_student_note",
          "Save the teacher's observation about a student. Parents can ask about notes, so set private to "
          "true when the teacher says it is only for them or it is about the family or health.",
@@ -200,7 +215,7 @@ TEACHER_TOOLS = Registry([
              "student": _STUDENT,
              "note": {"type": "string", "description": "The observation as one or two clear sentences."},
              "private": {"type": "boolean"}},
-          "required": ["student", "note"]}, add_student_note),
+          "required": ["student", "note"]}, add_student_note, writes=True),
     Tool("update_fee",
          "Prepare a fee change: a payment received, or a new amount due. It is not saved until the teacher "
          "taps Confirm on the card that appears.",
@@ -210,7 +225,7 @@ TEACHER_TOOLS = Registry([
              "amount": {"type": "integer", "description": "Rupees."},
              "title": {"type": "string", "description": "For new_due: what the fee is for."},
              "due_date": {"type": "string", "description": "For new_due. " + _DATE}},
-          "required": ["student", "kind", "amount"]}, update_fee),
+          "required": ["student", "kind", "amount"]}, update_fee, writes=True),
     Tool("get_class_summary",
          "Absences, pending fees and homework given for a class over the last N days.",
          {"type": "object", "properties": {

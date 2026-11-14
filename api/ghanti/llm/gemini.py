@@ -18,7 +18,8 @@ class GeminiLLM:
         if not config.GEMINI_API_KEY:
             raise LLMError("GEMINI_API_KEY is not set")
 
-    def generate(self, system: str, messages: list[Message], tools: list[dict] | None = None) -> Reply:
+    def generate(self, system: str, messages: list[Message], tools: list[dict] | None = None,
+                 schema: dict | None = None) -> Reply:
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [_content(m) for m in messages],
@@ -26,6 +27,8 @@ class GeminiLLM:
         }
         if tools:
             body["tools"] = [{"functionDeclarations": tools}]
+        if schema:  # reply as JSON in this shape, instead of free text
+            body["generationConfig"] |= {"responseMimeType": "application/json", "responseSchema": schema}
 
         r = self._try_all(body)
         if r.status_code == 429 and (wait := _retry_delay(r)) <= MAX_WAIT:

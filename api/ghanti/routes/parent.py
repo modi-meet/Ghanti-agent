@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..agent.loop import run_turn
-from ..agent.parent_tools import PARENT_TOOLS, get_attendance, get_fee_status
+from ..agent.loop import answer
+from ..agent.parent_tools import PARENT_TOOLS, get_attendance, get_fee_status, records
 from ..agent.prompts import parent_prompt
 from ..agent.registry import ToolContext
 from ..db import get_db
@@ -95,8 +95,8 @@ def talk(call_id: int, text: str | None = Form(None), audio: UploadFile | None =
 
     ctx = ToolContext(db=db, user=user, today=config.today(), student=child)
     try:
-        reply = run_turn(get_llm(), parent_prompt(user, child, teacher, ctx.today), PARENT_TOOLS, ctx,
-                         history(db, convo.id), heard)
+        reply = answer(get_llm(), PARENT_TOOLS, ctx, history(db, convo.id), heard,
+                       prompt=lambda rec: parent_prompt(user, child, teacher, ctx.today, rec), records=records)
     except LLMError as e:
         raise llm_failed(e)
     if not reply:

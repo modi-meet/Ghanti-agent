@@ -38,7 +38,8 @@ class LLMError(Exception):
 
 
 class LLM(Protocol):
-    def generate(self, system: str, messages: list[Message], tools: list[dict] | None = None) -> Reply: ...
+    def generate(self, system: str, messages: list[Message], tools: list[dict] | None = None,
+                 schema: dict | None = None) -> Reply: ...
 
 
 def get_llm() -> LLM:

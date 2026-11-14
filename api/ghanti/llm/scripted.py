@@ -7,6 +7,7 @@ class ScriptedLLM:
         self.replies = list(replies)
         self.seen: list[list[Message]] = []
 
-    def generate(self, system: str, messages: list[Message], tools: list[dict] | None = None) -> Reply:
+    def generate(self, system: str, messages: list[Message], tools: list[dict] | None = None,
+                 schema: dict | None = None) -> Reply:
         self.seen.append(list(messages))
         return self.replies.pop(0)

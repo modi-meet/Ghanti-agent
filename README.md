@@ -6,6 +6,20 @@ their child in their own language and can ask anything back.
 My entry for Gnani AI's Great Indian AI Internship Challenge, built on Gnani's
 Prisma (speech to text) and Timbre (text to speech).
 
+## How the agent works
+
+The main idea is tool calling through a small harness: the model asks for a
+tool, a dispatcher validates and runs it, the result goes back, and the model
+answers. Teachers get write tools (homework, attendance, notes, fees), parents
+get read tools scoped to their own child. That's `AGENT_MODE=tools`.
+
+This runs on Gemini's free quota, though, and a tool loop is two or more
+requests per turn. At 15 requests a minute the limit was hit all the time. So
+the default is `AGENT_MODE=single`: one request per turn. The records the read
+tools would have fetched go into the prompt, the model replies with JSON saying
+what to say and which write tools to run, and the same dispatcher runs them.
+Same tools, same guardrails, half the requests. With a paid key, switch back.
+
 ## Run it
 
 Backend:
@@ -34,7 +48,7 @@ Tests: `cd api && .venv/bin/python -m pytest`
 
 ## Where things are
 
-- `api/ghanti/agent/`: the loop, the tool registry, and the teacher and parent tools
+- `api/ghanti/agent/`: both agent modes (`loop.py`), the tool registry, and the teacher and parent tools
 - `api/ghanti/llm/`: the LLM gateway and the Gemini adapter (tries `GEMINI_MODELS` in order)
 - `api/ghanti/speech/`: Gnani and mock speech adapters
 - `api/ghanti/routes/`: the HTTP API

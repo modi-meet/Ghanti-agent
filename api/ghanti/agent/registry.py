@@ -35,6 +35,7 @@ class Tool:
     description: str
     parameters: dict  # JSON schema, kept to what Gemini's function calling accepts
     handler: Callable[[ToolContext, dict], dict]
+    writes: bool = False  # changes something, as opposed to looking something up
 
 
 class Registry:
@@ -44,6 +45,9 @@ class Registry:
     def schemas(self) -> list[dict]:
         return [{"name": t.name, "description": t.description, "parameters": t.parameters}
                 for t in self.tools.values()]
+
+    def write_tools(self) -> list[Tool]:
+        return [t for t in self.tools.values() if t.writes]
 
     def dispatch(self, ctx: ToolContext, call: ToolCall) -> ToolResult:
         started = time.perf_counter()

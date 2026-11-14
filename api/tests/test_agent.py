@@ -1,5 +1,8 @@
 """The loop, the tools and the guardrails, with a scripted LLM so no key is needed."""
-from ghanti.agent.loop import MAX_ROUNDS, run_turn
+import json
+
+from ghanti.agent import parent_tools, teacher_tools
+from ghanti.agent.loop import MAX_ROUNDS, run_single, run_turn
 from ghanti.agent.parent_tools import PARENT_TOOLS
 from ghanti.agent.teacher_tools import TEACHER_TOOLS
 from ghanti.llm import Reply, ToolCall
@@ -29,7 +32,7 @@ def test_one_sentence_two_homeworks(teacher_ctx):
 
 def test_two_rohans_are_refused_and_nothing_is_saved(teacher_ctx):
     result = TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", students=["Meera", "Rohan"], status="late"))
-    assert "Rohan Desai, Rohan Mehta" in result.content["error"]
+    assert "Rohan Desai or Rohan Mehta" in result.content["error"]
     assert teacher_ctx.db.query(Attendance).filter_by(date=teacher_ctx.today).count() == 0  # not even Meera
 
 
@@ -116,3 +119,40 @@ def test_homework_with_no_dates_means_today_or_the_latest_day(parent_ctx):
     parent_ctx.db.commit()
     out = PARENT_TOOLS.dispatch(parent_ctx, call("get_homework")).content
     assert [h["task"] for h in out["homework"]] == ["today's"] and "note" not in out
+
+
+# ---- single mode: one request, records in the prompt, JSON back ----
+
+def say(text, **calls):
+    return Reply(json.dumps({"say": text, "calls": calls}))
+
+
+def test_single_mode_runs_every_call_in_one_request(teacher_ctx):
+    llm = ScriptedLLM([say("Homework saved and Meera marked absent.",
+                           add_homework=[{"subject": "physics", "task": "Lesson 3", "class_name": "", "due_date": ""}],
+                           mark_attendance=[{"students": ["Meera Nair"], "status": "absent"}])])
+    reply = run_single(llm, "system", TEACHER_TOOLS, teacher_ctx, [], "...")
+    assert reply == "Homework saved and Meera marked absent." and len(llm.seen) == 1
+    assert [t["name"] for t in teacher_ctx.trace] == ["add_homework", "mark_attendance"]
+    assert len(teacher_ctx.action_ids) == 2
+
+
+def test_single_mode_says_the_problem_when_a_call_fails(teacher_ctx):
+    llm = ScriptedLLM([say("Rohan is marked late.", mark_attendance=[{"students": ["Rohan"], "status": "late"}])])
+    reply = run_single(llm, "system", TEACHER_TOOLS, teacher_ctx, [], "...")
+    assert "Which one did you mean?" in reply and "marked late" not in reply
+
+
+def test_single_mode_cannot_run_read_tools_or_unknown_ones(teacher_ctx):
+    llm = ScriptedLLM([say("ok", get_class_summary=[{}], drop_tables=[{}])])
+    run_single(llm, "system", TEACHER_TOOLS, teacher_ctx, [], "...")
+    assert teacher_ctx.action_ids == []  # a lookup changes nothing, and the unknown tool was refused
+    assert teacher_ctx.trace[-1] == {"name": "drop_tables", "args": {}, "ok": False, "ms": teacher_ctx.trace[-1]["ms"]}
+
+
+def test_records_for_the_prompt_respect_the_same_guardrails(parent_ctx, teacher_ctx):
+    theirs = parent_tools.records(parent_ctx)
+    assert len(theirs["teacher_notes"]) == 1  # the private note stays out of the prompt too
+    assert theirs["homework_given_today"] == [] and len(theirs["homework_given_earlier_this_week"]) == 4
+    assert len(theirs["attendance_last_14_days"]["absent_on"]) == 3
+    assert "Rohan Mehta" in teacher_tools.records(teacher_ctx)["class 8B"]["roster"]

@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..agent.common import school_days
-from ..agent.loop import run_turn
+from ..agent.loop import answer
 from ..agent.prompts import teacher_prompt
 from ..agent.registry import ToolContext
-from ..agent.teacher_tools import TEACHER_TOOLS
+from ..agent.teacher_tools import TEACHER_TOOLS, records
 from ..db import get_db
 from ..llm import LLMError, get_llm
 from ..models import Action, Attendance, Conversation, Fee, Homework, InboxItem, Note, SchoolClass, Student, Turn, User, iso
@@ -72,8 +72,8 @@ def chat(text: str | None = Form(None), audio: UploadFile | None = File(None),
     convo = _conversation(db, user)
     ctx = ToolContext(db=db, user=user, today=config.today())
     try:
-        reply = run_turn(get_llm(), teacher_prompt(user, classes, ctx.today), TEACHER_TOOLS, ctx,
-                         history(db, convo.id), heard)
+        reply = answer(get_llm(), TEACHER_TOOLS, ctx, history(db, convo.id), heard,
+                       prompt=lambda rec: teacher_prompt(user, classes, ctx.today, rec), records=records)
     except LLMError as e:
         raise llm_failed(e)
     reply = reply or ("Done." if ctx.action_ids else "Sorry, I didn't catch that. Could you say it again?")

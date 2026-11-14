@@ -70,6 +70,22 @@ def ask_teacher(ctx: ToolContext, args: dict) -> dict:
     return {"sent": True, "tell_parent": "The teacher has the question and the answer will come as a voice message."}
 
 
+def records(ctx: ToolContext) -> dict:
+    """What the read tools would fetch, gathered up front for single mode."""
+    yesterday = ctx.today - timedelta(days=1)
+    earlier = get_homework(ctx, {"from_date": (ctx.today - timedelta(days=6)).isoformat(),
+                                 "to_date": yesterday.isoformat()})["homework"]
+    today = get_homework(ctx, {"from_date": ctx.today.isoformat(), "to_date": ctx.today.isoformat()})["homework"]
+    return {
+        "attendance_last_14_days": get_attendance(ctx, {"days": 14}),
+        # Kept apart so "today's homework" can't sweep up yesterday's.
+        "homework_given_today": today,
+        "homework_given_earlier_this_week": earlier,
+        "fees": get_fee_status(ctx, {})["fees"],
+        "teacher_notes": get_teacher_notes(ctx, {})["notes"],
+    }
+
+
 PARENT_TOOLS = Registry([
     Tool("get_attendance",
          "The child's attendance over the last N days: days present, and the dates absent or late.",
@@ -94,5 +110,5 @@ PARENT_TOOLS = Registry([
          {"type": "object", "properties": {
              "question": {"type": "string", "description": "The message in clear English for the teacher."},
              "parent_words": {"type": "string", "description": "What the parent actually said, in their language."}},
-          "required": ["question"]}, ask_teacher),
+          "required": ["question"]}, ask_teacher, writes=True),
 ])
