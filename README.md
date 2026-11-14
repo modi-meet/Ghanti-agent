@@ -35,7 +35,7 @@ Tests: `cd api && .venv/bin/python -m pytest`
 ## Where things are
 
 - `api/ghanti/agent/`: the loop, the tool registry, and the teacher and parent tools
-- `api/ghanti/llm/`: the LLM gateway and the Gemini adapter
+- `api/ghanti/llm/`: the LLM gateway and the Gemini adapter (tries `GEMINI_MODELS` in order)
 - `api/ghanti/speech/`: Gnani and mock speech adapters
 - `api/ghanti/routes/`: the HTTP API
 - `web/app/teacher/`: the Chat tab and the dashboard tabs

@@ -12,8 +12,9 @@ from ..models import Conversation, Homework, InboxItem, Message, SchoolClass, St
 from ..speech import LANGUAGE_NAMES
 from . import voice
 
-STYLE = """Write it in {language}, the way people really speak it, in its own script. School words like homework, fees, maths can stay in English.
-It will be read aloud by a voice, so: short sentences, amounts and dates as spoken words, no lists, no symbols, no markdown.
+STYLE = """Write it in {language}, the way people really speak it, in its own script. School words like homework, fees, maths are fine, spelled the way they sound in that script.
+It will be read aloud by a voice, so: short sentences, no lists, no symbols, no markdown.
+Numbers, dates and amounts as {language} number words, the way a person says them aloud. Never English number words spelled in {language} letters.
 Reply with only the words to be spoken."""
 
 
@@ -69,7 +70,7 @@ def send_weekly(db: Session, llm: LLM, cls: SchoolClass) -> int:
             "attendance_last_7_days": get_attendance(ctx, {"days": 7}),
             "fees": [f for f in get_fee_status(ctx, {})["fees"] if f["balance"] > 0],
             "teacher_notes": get_teacher_notes(ctx, {})["notes"][:3],
-            "homework_this_week": len(get_homework(ctx, {"from_date": (today - timedelta(days=6)).isoformat()})["homework"]),
+            "homework_this_week": len(get_homework(ctx, {"from_date": (today - timedelta(days=6)).isoformat(), "to_date": today.isoformat()})["homework"]),
         }, ensure_ascii=False)
         script = _write(llm, f"This is the weekly call from {teacher.name}'s class to {s.parent.name}, parent of "
                              f"{s.name.split()[0]}. In four or five sentences: greet them, give the week's attendance, "
@@ -96,8 +97,9 @@ def summarise_call(db: Session, llm: LLM, convo: Conversation, student: Student)
         return
     transcript = "\n".join(f"{'Parent' if t.role == 'user' else 'Assistant'}: {t.text}" for t in turns)
     summary = llm.generate(
-        "You summarise a school's call with a parent for the class teacher. Two short sentences in English: "
-        "what the parent asked or said, and anything the teacher should follow up. Plain text only.",
+        "You summarise a school's call with a parent for the class teacher, in plain English. First sentence: "
+        "what the parent asked about. Second sentence: anything the parent told the school or wants from the "
+        "teacher, or 'Nothing to follow up.' Use only what is in the transcript.",
         [LLMMessage(role="user", text=transcript)]).text.strip()
     db.add(InboxItem(teacher_id=student.school_class.teacher_id, student_id=student.id, kind="summary", text=summary))
     db.commit()

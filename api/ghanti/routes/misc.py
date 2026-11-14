@@ -13,7 +13,7 @@ router = APIRouter(tags=["misc"])
 
 @router.get("/health")
 def health():
-    return {"ok": True, "speech_mode": config.SPEECH_MODE, "model": config.GEMINI_MODEL}
+    return {"ok": True, "speech_mode": config.SPEECH_MODE, "models": config.GEMINI_MODELS}
 
 
 @router.get("/audio/{key}")

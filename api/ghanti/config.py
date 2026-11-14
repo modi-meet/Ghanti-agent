@@ -24,7 +24,10 @@ DATABASE_URL = _db_url()
 
 GNANI_API_KEY = os.getenv("GNANI_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Tried in order. The free tier allows 15 requests a minute on a Flash-Lite model and 5 on
+# a Flash one, each counted separately, so a busy model falls through to the next.
+GEMINI_MODELS = [m.strip() for m in os.getenv(
+    "GEMINI_MODELS", "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash").split(",") if m.strip()]
 
 # "mock" costs no Gnani credits. Switch to "gnani" for the real thing.
 SPEECH_MODE = os.getenv("SPEECH_MODE", "mock")

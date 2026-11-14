@@ -22,7 +22,17 @@ smoke test on 14 Nov 2026. Full docs index: docs.gnani.ai/llms.txt
 | Prisma v3.0 on the Gujarati clip, `indic-auto` | detected `gu-IN`, one word off (પાઠ heard as પાર્ટ) | 0.5s |
 
 So: Timbre v2.5 for anything conversational. v3.0 is too slow for a call.
-The Prisma clips were Timbre's own output, so real mic audio still needs a test.
+
+One real pass through the app, a Gujarati parent asking about homework and fees:
+
+| Step | Time |
+|---|---|
+| Prisma v3.0 on a 4s question (heard "આજનું homework શું છે અને Aarav ની fees કેટલી બાકી છે?") | part of 2.9s |
+| Gemini Flash-Lite, two tool calls, then the answer | rest of 2.9s |
+| Timbre v2.5 on the 3-sentence answer, 20s of audio in 3 requests | 2.8s |
+
+Fed back through Prisma, the spoken answer came out word for word. Both clips
+were Timbre's own voice, so a real person on a real mic still needs a test.
 
 ## Speech to text (Prisma)
 

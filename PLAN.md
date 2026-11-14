@@ -34,19 +34,23 @@ The base prompt holds only persona, tone and guardrails. Data comes from tools.
 
 | Teacher tools | Parent tools (read only) |
 |---|---|
-| `find_student(name, class_name?)` | `get_attendance(days)` |
-| `add_homework(class_name, subject, task, due_date)` | `get_homework(from_date, to_date, subject?)` |
-| `mark_attendance(student_ids, status, date)` | `get_fee_status()` |
-| `add_student_note(student_id, note, private)` | `get_teacher_notes()` |
-| `update_fee(student_id, kind, amount)` | `ask_teacher(question, parent_words)` |
-| `get_class_summary(class_name, days)` | |
-| `get_student_record(student_id, days)` | |
+| `add_homework(class_name, subject, task, due_date)` | `get_attendance(days)` |
+| `mark_attendance(students, status, date)` | `get_homework(from_date, to_date, subject?)` |
+| `add_student_note(student, note, private)` | `get_fee_status()` |
+| `update_fee(student, kind, amount)` | `get_teacher_notes()` |
+| `get_class_summary(class_name, days)` | `ask_teacher(question, parent_words)` |
+| `get_student_record(student, days)` | |
+
+Teacher tools take student **names** and find the student themselves. An earlier
+version had a separate `find_student` step, and in a real run the model looked
+two students up, then said it had marked them absent without calling the tool
+that does it. One call per job removed that failure and halved the LLM calls.
 
 Guardrails that live in code, not in the prompt:
 
 - Parent tools never take a student id. The server fills it in from the login, so one parent can't reach another child's data.
 - `get_teacher_notes` never returns notes marked private.
-- Speech mishears names. Roster names go to Prisma as key terms, `find_student` fuzzy-matches, and the agent asks back when two students match.
+- Speech mishears names. Roster names go to Prisma as key terms, the tools fuzzy-match, and when two students match nothing is saved and the agent asks which one.
 - Every teacher action shows a receipt card with undo. Fee changes need a tap to confirm.
 - Each tool call is logged (name, args, time taken) and shown under the reply.
 
@@ -63,7 +67,7 @@ api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Mumbai re
 - Logins: seeded demo accounts picked from a list, signed cookie session. No passwords, the data is all synthetic.
 - Speech: Prisma v3.0 and Timbre v2.5 over REST, server side only. The browser records 16 kHz WAV, clips under 30s.
 - Spoken audio is stored in the database keyed by a hash of the text, made on first play. No blob store needed.
-- LLM: Gemini with function calling, behind a gateway. Evon under vLLM would be one more adapter.
+- LLM: Gemini with function calling, behind a gateway. It tries a list of models in order (`GEMINI_MODELS`), because the free tier allows 15 requests a minute on Flash-Lite and only 5 on Flash, counted per model. Evon under vLLM would be one more adapter.
 - Seed: one teacher, class 8B with eight students (two are called Rohan on purpose), parents in Hindi, Gujarati and English.
 
 ## Spending credits carefully
@@ -72,7 +76,7 @@ api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Mumbai re
 - `SPEECH_MODE=mock` is the default: a beep out, a canned line in, zero credits. Every screen also takes typed text.
 - Every Timbre result is cached. Nothing is spoken twice.
 - Real speech is capped per user and per day (`VOICE_CAP_PER_USER`, `VOICE_CAP_TOTAL`).
-- Used so far: 5 calls in the smoke test (3 Timbre, 2 Prisma).
+- Used so far: 9 calls. 5 in the smoke test, 4 in the one real voice loop.
 
 ## Where it stands
 
@@ -80,16 +84,23 @@ Done and checked:
 
 - [x] Smoke test in Hindi and Gujarati (results in [API.md](API.md))
 - [x] Backend: schema, seed, logins, agent loop, both tool sets, undo/confirm, reports, inbox, cron endpoint
-- [x] 10 backend tests pass (loop, tools, guardrails) using a scripted LLM
-- [x] Frontend: login, teacher Chat and five tabs, parent portal, call screen
-- [x] Clicked through in a browser in mock mode, with a scripted agent turn
+- [x] 13 backend tests pass (loop, tools, guardrails) using a scripted LLM
+- [x] Frontend on shadcn/ui: login, teacher Chat and five tabs, parent portal, call screen
+- [x] Real Gemini, teacher side: seven instructions in English and Hinglish, each right in one tool round, 2 to 3 seconds
+- [x] Real Gemini, parent side: weekly call and homework message written in Gujarati and Hindi, questions answered from tools, private note not leaked, other students refused, question passed to the teacher's inbox
+- [x] Real voice loop once: Gujarati audio in, Prisma, agent with two tools, Timbre audio out, about 6 seconds end to end
 
 Not done:
 
-- [ ] One real agent turn. **The Gemini key in `api/.env` is rejected as invalid**, so the live LLM path has never run.
-- [ ] One full pass with `SPEECH_MODE=gnani` (mic to Prisma to agent to Timbre)
+- [ ] Speaking into the mic in a browser. The real voice loop was fed a Timbre clip, not a person.
 - [ ] Deploy: Vercel login, Neon database, env vars, Vercel config for FastAPI and the daily cron
 - [ ] Test on a real phone
+
+Known rough edges from the real runs:
+
+- Flash-Lite's Gujarati has small slips: a doubled letter once, and it spells Aarav as આરાવ.
+- Replies can run long for a phone call. Three sentences of Gujarati is about 20 seconds of audio.
+- A stronger model would help with both. That needs billing on the Gemini key, the free tier is too slow at 5 a minute.
 
 ## Risks to check at deploy
 

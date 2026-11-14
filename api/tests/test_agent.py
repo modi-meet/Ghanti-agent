@@ -27,20 +27,33 @@ def test_one_sentence_two_homeworks(teacher_ctx):
     assert llm.seen[1][-1].role == "tool" and len(llm.seen[1][-1].tool_results) == 2
 
 
-def test_two_rohans_are_flagged(teacher_ctx):
-    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("find_student", name="Rohan")).content
-    assert len(result["matches"]) == 2 and "which one" in result["note"]
+def test_two_rohans_are_refused_and_nothing_is_saved(teacher_ctx):
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", students=["Meera", "Rohan"], status="late"))
+    assert "Rohan Desai, Rohan Mehta" in result.content["error"]
+    assert teacher_ctx.db.query(Attendance).filter_by(date=teacher_ctx.today).count() == 0  # not even Meera
 
 
 def test_misheard_name_gets_the_roster(teacher_ctx):
-    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("find_student", name="Zubin")).content
-    assert result["matches"] == [] and "Aarav Patel" in result["note"]
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("add_student_note", student="Zubin", note="x"))
+    assert "Aarav Patel" in result.content["error"]
+
+
+def test_names_are_found_loosely(teacher_ctx):
+    for said, real in [("Kabir", "Kabir Singh"), ("kabeer singh", "Kabir Singh"), ("Mehta", "Rohan Mehta"), ("Arav", "Aarav Patel")]:
+        assert TEACHER_TOOLS.dispatch(teacher_ctx, call("get_student_record", student=said)).content["student"] == real
+
+
+def test_homework_due_on_sunday_moves_to_monday(teacher_ctx):
+    from datetime import date
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("add_homework", subject="maths", task="x", due_date="2026-11-15"))
+    assert result.content["due"].startswith("Monday")
+    assert teacher_ctx.db.query(Homework).filter_by(task="x").one().due_date == date(2026, 11, 16)
 
 
 def test_attendance_then_undo(teacher_ctx):
     db = teacher_ctx.db
     meera = db.query(Student).filter_by(name="Meera Nair").one()
-    TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", student_ids=[meera.id], status="absent"))
+    TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", students=["Meera Nair"], status="absent"))
     assert db.query(Attendance).filter_by(student_id=meera.id, date=teacher_ctx.today).one().status == "absent"
     actions.undo(db, db.get(Action, teacher_ctx.action_ids[0]))
     assert db.query(Attendance).filter_by(student_id=meera.id, date=teacher_ctx.today).first() is None
@@ -49,7 +62,7 @@ def test_attendance_then_undo(teacher_ctx):
 def test_fee_waits_for_confirm(teacher_ctx):
     db = teacher_ctx.db
     kabir = db.query(Student).filter_by(name="Kabir Singh").one()
-    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("update_fee", student_id=kabir.id, kind="payment", amount=5000))
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("update_fee", student="Kabir", kind="payment", amount=5000))
     assert result.content["needs_confirmation"]
     fee = db.query(Fee).filter_by(student_id=kabir.id).one()
     assert fee.amount_paid == 0  # nothing moved yet
@@ -61,10 +74,10 @@ def test_fee_waits_for_confirm(teacher_ctx):
 
 
 def test_bad_arguments_come_back_as_an_error_not_a_crash(teacher_ctx):
-    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", student_ids=[1], status="sleeping"))
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("mark_attendance", students=["Meera"], status="sleeping"))
     assert "error" in result.content and teacher_ctx.trace[-1]["ok"] is False
-    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("add_student_note", student_id=9999, note="x"))
-    assert "find_student" in result.content["error"]
+    result = TEACHER_TOOLS.dispatch(teacher_ctx, call("no_such_tool"))
+    assert "No tool named" in result.content["error"]
 
 
 def test_loop_stops_after_max_rounds(teacher_ctx):
@@ -93,3 +106,13 @@ def test_question_reaches_the_teacher(parent_ctx):
                                            parent_words="कबीर को साइंस में मदद मिल सकती है?"))
     item = parent_ctx.db.query(InboxItem).one()
     assert item.kind == "question" and item.student_id == parent_ctx.student.id and item.status == "open"
+
+
+def test_homework_with_no_dates_means_today_or_the_latest_day(parent_ctx):
+    out = PARENT_TOOLS.dispatch(parent_ctx, call("get_homework")).content
+    assert "Nothing was given today" in out["note"] and len(out["homework"]) == 2  # the seed's latest day
+    parent_ctx.db.add(Homework(class_id=parent_ctx.student.class_id, subject="Maths", task="today's",
+                               assigned_date=parent_ctx.today, due_date=parent_ctx.today))
+    parent_ctx.db.commit()
+    out = PARENT_TOOLS.dispatch(parent_ctx, call("get_homework")).content
+    assert [h["task"] for h in out["homework"]] == ["today's"] and "note" not in out

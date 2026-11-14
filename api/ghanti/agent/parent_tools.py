@@ -25,16 +25,28 @@ def get_attendance(ctx: ToolContext, args: dict) -> dict:
 
 
 def get_homework(ctx: ToolContext, args: dict) -> dict:
-    start = parse_date(args.get("from_date"), ctx.today - timedelta(days=2))
-    end = parse_date(args.get("to_date"), ctx.today)
-    q = ctx.db.query(Homework).filter(Homework.class_id == ctx.student.class_id,
-                                      Homework.assigned_date >= start, Homework.assigned_date <= end)
-    items = q.order_by(Homework.assigned_date).all()
+    q = ctx.db.query(Homework).filter(Homework.class_id == ctx.student.class_id)
+    note = ""
+    if args.get("from_date") or args.get("to_date"):
+        start = parse_date(args.get("from_date"), ctx.today)
+        end = parse_date(args.get("to_date"), ctx.today)
+        items = q.filter(Homework.assigned_date >= start, Homework.assigned_date <= end).all()
+    else:
+        # No dates asked for means today's. If nothing was given today, show the last day something was.
+        items = q.filter(Homework.assigned_date == ctx.today).all()
+        if not items:
+            latest = q.order_by(Homework.assigned_date.desc()).first()
+            if latest:
+                items = q.filter(Homework.assigned_date == latest.assigned_date).all()
+                note = f"Nothing was given today. This is from {latest.assigned_date.strftime('%A %d %B')}."
     if args.get("subject"):
         wanted = args["subject"].lower()
         items = [h for h in items if wanted in h.subject.lower()]
-    return {"homework": [{"subject": h.subject, "task": h.task, "given_on": h.assigned_date.strftime("%A %d %B"),
-                          "due_on": h.due_date.strftime("%A %d %B")} for h in items]}
+    out = {"homework": [{"subject": h.subject, "task": h.task, "given_on": h.assigned_date.strftime("%A %d %B"),
+                         "due_on": h.due_date.strftime("%A %d %B")} for h in sorted(items, key=lambda h: h.assigned_date)]}
+    if note:
+        out["note"] = note
+    return out
 
 
 def get_fee_status(ctx: ToolContext, args: dict) -> dict:
@@ -64,7 +76,8 @@ PARENT_TOOLS = Registry([
          {"type": "object", "properties": {
              "days": {"type": "integer", "description": "How many days back. Defaults to 7."}}}, get_attendance),
     Tool("get_homework",
-         "Homework given to the child's class. Defaults to the last three days.",
+         "Homework given to the child's class. With no dates it returns today's, or the most recent day's if "
+         "nothing was given today. Pass dates for any other day or range.",
          {"type": "object", "properties": {
              "from_date": {"type": "string", "description": "YYYY-MM-DD."},
              "to_date": {"type": "string", "description": "YYYY-MM-DD."},

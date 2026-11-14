@@ -43,6 +43,6 @@ The non-tech side (video, post, form) lives in [NON_TECH.md](NON_TECH.md).
 - [x] Smoke test STT and TTS with curl (see [API.md](API.md))
 - [x] Pick an idea: Ghanti, see [PLAN.md](PLAN.md)
 - [x] Build the app and seed synthetic demo data
-- [ ] Run the voice loop end to end with real keys
+- [x] Run the voice loop end to end with real keys
 - [ ] Deploy
 - [ ] Hand over to NON_TECH.md
