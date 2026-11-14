@@ -10,6 +10,11 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def iso(dt: datetime) -> str:
+    """SQLite hands datetimes back without a timezone. They are always UTC, so say so."""
+    return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).isoformat()
+
+
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)

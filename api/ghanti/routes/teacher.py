@@ -12,7 +12,7 @@ from ..agent.registry import ToolContext
 from ..agent.teacher_tools import TEACHER_TOOLS
 from ..db import get_db
 from ..llm import LLMError, get_llm
-from ..models import Action, Attendance, Conversation, Fee, Homework, InboxItem, Note, SchoolClass, Student, Turn, User
+from ..models import Action, Attendance, Conversation, Fee, Homework, InboxItem, Note, SchoolClass, Student, Turn, User, iso
 from ..seed import reset_db
 from ..services import actions, reports, voice
 from .auth import teacher_user
@@ -195,7 +195,7 @@ def list_students(user: User = Depends(teacher_user), db: Session = Depends(get_
                                                      Attendance.status == "absent").count(),
             "fee_balance": sum(f.amount_due - f.amount_paid for f in fees),
             "notes": [{"id": n.id, "text": n.text, "private": n.private,
-                       "created_at": n.created_at.isoformat()} for n in notes],
+                       "created_at": iso(n.created_at)} for n in notes],
         })
     return out
 
@@ -245,11 +245,7 @@ def inbox(user: User = Depends(teacher_user), db: Session = Depends(get_db)):
     items = db.query(InboxItem).filter_by(teacher_id=user.id).order_by(InboxItem.id.desc()).limit(50).all()
     return [{"id": i.id, "kind": i.kind, "student": i.student.name, "parent": i.student.parent.name,
              "text": i.text, "original": i.original, "status": i.status, "reply": i.reply,
-             "created_at": i.created_at.isoformat()} for i in items]
-
-
-class ReplyBody(BaseModel):
-    text: str
+             "created_at": iso(i.created_at)} for i in items]
 
 
 def _own_item(db: Session, user: User, item_id: int) -> InboxItem:
@@ -260,13 +256,16 @@ def _own_item(db: Session, user: User, item_id: int) -> InboxItem:
 
 
 @router.post("/inbox/{item_id}/reply")
-def reply_to_parent(item_id: int, body: ReplyBody, user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+def reply_to_parent(item_id: int, text: str | None = Form(None), audio: UploadFile | None = File(None),
+                    user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+    """Typed or spoken. Either way the parent hears it in their own language."""
     item = _own_item(db, user, item_id)
+    answer = voice.listen(db, user, audio, ["en-IN", "hi-IN"], [item.student.name]) if audio else said(text)
     try:
-        reports.send_reply(db, get_llm(), item, said(body.text))
+        reports.send_reply(db, get_llm(), item, answer)
     except LLMError as e:
         raise llm_failed(e)
-    return {"ok": True}
+    return {"ok": True, "reply": answer}
 
 
 @router.post("/inbox/{item_id}/read")

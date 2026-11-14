@@ -11,7 +11,7 @@ from ..agent.prompts import parent_prompt
 from ..agent.registry import ToolContext
 from ..db import get_db
 from ..llm import LLMError, get_llm
-from ..models import Conversation, Homework, Message, Student, Turn, User
+from ..models import Conversation, Homework, Message, Student, Turn, User, iso
 from ..services import reports, voice
 from .auth import parent_user
 from .shared import history, llm_failed, said, turn_json
@@ -28,7 +28,7 @@ def _child(db: Session, user: User) -> Student:
 
 def _message_json(m: Message) -> dict:
     return {"id": m.id, "kind": m.kind, "title": m.title, "script": m.script, "heard": m.heard,
-            "audio_url": f"/api/audio/{m.audio_key}", "created_at": m.created_at.isoformat()}
+            "audio_url": f"/api/audio/{m.audio_key}", "created_at": iso(m.created_at)}
 
 
 @router.get("/home")

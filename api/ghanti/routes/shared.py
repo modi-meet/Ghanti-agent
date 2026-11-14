@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from ..llm import LLMError, Message as LLMMessage
-from ..models import Action, Turn
+from ..models import Action, Turn, iso
 
 HISTORY_TURNS = 8
 
@@ -23,7 +23,7 @@ def turn_json(db: Session, t: Turn) -> dict:
     return {"id": t.id, "role": t.role, "text": t.text,
             "audio_url": f"/api/audio/{t.audio_key}" if t.audio_key else None,
             "trace": t.trace, "actions": [action_json(a) for a in actions],
-            "created_at": t.created_at.isoformat()}
+            "created_at": iso(t.created_at)}
 
 
 def llm_failed(e: LLMError) -> HTTPException:
