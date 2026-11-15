@@ -6,7 +6,8 @@ from . import config
 _sqlite = config.DATABASE_URL.startswith("sqlite")
 engine = create_engine(
     config.DATABASE_URL,
-    connect_args={"check_same_thread": False} if _sqlite else {},
+    # prepare_threshold off: the hosted Postgres sits behind a connection pooler.
+    connect_args={"check_same_thread": False} if _sqlite else {"prepare_threshold": None},
     pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
