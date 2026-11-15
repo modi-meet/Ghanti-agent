@@ -80,8 +80,3 @@ both API keys, `SESSION_SECRET`, `CRON_SECRET` and `SPEECH_MODE=gnani`.
 
 - [PLAN.md](PLAN.md): what it does, how it's built, what's left
 - [API.md](API.md): Gnani's models and endpoints, with what we measured
-- [TASK.md](TASK.md): what the challenge asks for
-- [GOAL.md](GOAL.md): prizes and how they pick
-- [NON_TECH.md](NON_TECH.md): registration, video, post, submission
-- [IDEAS.md](IDEAS.md): the options we considered
-- [ui:ux-guide.md](ui:ux-guide.md): how the dashboard should look

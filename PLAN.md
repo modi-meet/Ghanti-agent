@@ -81,7 +81,7 @@ api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Singapore
 ```
 
 - The browser only talks to `web`. It proxies `/api/*` to FastAPI, so cookies are same-origin and there's no CORS.
-- UI follows `ui:ux-guide.md`: sidebar layout, Inter, hairline borders, nested radii, compact controls.
+- UI: sidebar layout, Inter, hairline borders, nested radii, compact controls.
 - Logins: seeded demo accounts picked from a list, signed cookie session. No passwords, the data is all synthetic.
 - Speech: Prisma v3.0 and Timbre v2.5 over REST, server side only. The browser records 16 kHz WAV, clips under 30s.
 - Spoken audio is stored in the database keyed by a hash of the text, made on first play. No blob store needed.
@@ -94,7 +94,7 @@ api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Singapore
 - `SPEECH_MODE=mock` is the default: a beep out, a canned line in, zero credits. In mock mode the teacher's Chat gets a menu of sample lines to send, since the mic hears nothing.
 - Every Timbre result is cached. Nothing is spoken twice.
 - Real speech is capped per user and per day (`VOICE_CAP_PER_USER`, `VOICE_CAP_TOTAL`).
-- Used so far: 10 calls. 5 in the smoke test, 4 in the one real voice loop, 1 checking the live site.
+- Building and checking it took 14 calls: 5 in the smoke test, 4 in the one real voice loop, 5 checking the live site and a speech bug.
 - The live site runs real speech, capped at 100 calls a day in total.
 
 ## Where it stands
@@ -109,10 +109,10 @@ Done and checked:
 - [x] Real Gemini, parent side, both modes: weekly call and homework message written in Gujarati and Hindi, questions answered from tools, private note not leaked, other students refused, question passed to the teacher's inbox
 - [x] Real voice loop once: Gujarati audio in, Prisma, agent with two tools, Timbre audio out, about 6 seconds end to end
 - [x] Deployed: https://ghanti-agent.vercel.app. Backend and database are both in Singapore, since the database isn't offered in Mumbai. Checked live: login, a teacher turn (2 seconds), one real Timbre reply, the weekly call (11 seconds for 8 parents), a parent question, the call summary, the daily job refusing a request without its secret
+- [x] Speaking into the mic in a browser on the live site, teacher and parent side, for the demo video
 
 Not done:
 
-- [ ] Speaking into the mic in a browser. The real voice loop was fed a Timbre clip, not a person.
 - [ ] Test on a real phone
 
 Known rough edges from the real runs:
