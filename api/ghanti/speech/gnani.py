@@ -40,7 +40,8 @@ class GnaniSpeech:
     def transcribe(self, audio: bytes, filename: str, languages: list[str], keyterms: list[str]) -> Transcript:
         data = {
             "model": "prisma-v3.0",
-            "language_code": ",".join(languages[:4]),
+            # Prisma rejects a repeated code, and an English-speaking parent would send en-IN twice.
+            "language_code": ",".join(list(dict.fromkeys(languages))[:4]),
             # codemix keeps English words in Latin letters, which is how school talk sounds
             "format": "codemix",
         }

@@ -103,7 +103,7 @@ Done and checked:
 
 - [x] Smoke test in Hindi and Gujarati (results in [API.md](API.md))
 - [x] Backend: schema, seed, logins, agent loop, both tool sets, undo/confirm, reports, inbox, cron endpoint
-- [x] 21 backend tests pass (both modes, tools, guardrails, the + Add routes) using a scripted LLM
+- [x] 22 backend tests pass (both modes, tools, guardrails, the + Add routes) using a scripted LLM
 - [x] Frontend on shadcn/ui: login, teacher Chat and five tabs, parent portal, call screen
 - [x] Real Gemini, teacher side, both modes: seven instructions in English and Hinglish, all right. 2 to 3 seconds in tools mode, about 1.5 in single mode
 - [x] Real Gemini, parent side, both modes: weekly call and homework message written in Gujarati and Hindi, questions answered from tools, private note not leaked, other students refused, question passed to the teacher's inbox
