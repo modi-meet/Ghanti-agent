@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..agent.common import school_days
+from ..agent.common import next_school_day, rupees, school_days
 from ..agent.loop import answer
 from ..agent.prompts import teacher_prompt
 from ..agent.registry import ToolContext
@@ -138,6 +138,33 @@ def list_homework(user: User = Depends(teacher_user), db: Session = Depends(get_
              "assigned_date": h.assigned_date.isoformat(), "due_date": h.due_date.isoformat()} for h in rows]
 
 
+class NewHomework(BaseModel):
+    subject: str
+    task: str
+    class_name: str | None = None  # only needed with more than one class
+    due_date: date | None = None   # defaults to the next school day
+
+
+@router.post("/homework")
+def add_homework(body: NewHomework, user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+    """The + Add button. Same rules as telling Ghanti, without the agent."""
+    classes = _classes(db, user)
+    cls = next((c for c in classes if c.name == body.class_name), classes[0] if len(classes) == 1 else None)
+    subject, task = body.subject.strip().title(), body.task.strip()
+    if cls is None or not subject or not task:
+        raise HTTPException(422, "Homework needs a class, a subject and a task.")
+    today = config.today()
+    due = body.due_date or next_school_day(today)
+    if due < today:
+        raise HTTPException(422, "The due date is in the past.")
+    if due.weekday() == 6:
+        due = next_school_day(due)
+    h = Homework(class_id=cls.id, subject=subject[:60], task=task, assigned_date=today, due_date=due)
+    db.add(h)
+    db.commit()
+    return {"id": h.id}
+
+
 @router.delete("/homework/{homework_id}")
 def delete_homework(homework_id: int, user: User = Depends(teacher_user), db: Session = Depends(get_db)):
     h = db.get(Homework, homework_id)
@@ -205,6 +232,22 @@ def list_students(user: User = Depends(teacher_user), db: Session = Depends(get_
     return out
 
 
+class NewNote(BaseModel):
+    text: str
+    private: bool = False
+
+
+@router.post("/students/{student_id}/notes")
+def add_note(student_id: int, body: NewNote, user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+    s = _own_student(db, user, student_id)
+    if not body.text.strip():
+        raise HTTPException(422, "Write the note first.")
+    n = Note(student_id=s.id, text=body.text.strip()[:1000], private=body.private)
+    db.add(n)
+    db.commit()
+    return {"id": n.id}
+
+
 class NotePatch(BaseModel):
     private: bool
 
@@ -241,6 +284,44 @@ def list_fees(user: User = Depends(teacher_user), db: Session = Depends(get_db))
              "due_date": f.due_date.isoformat(),
              "status": "paid" if f.amount_paid >= f.amount_due else "overdue" if f.due_date < today else "due"}
             for f in fees]
+
+
+class NewFee(BaseModel):
+    student_id: int
+    title: str
+    amount: int
+    due_date: date | None = None  # defaults to a week from today
+
+
+@router.post("/fees")
+def add_fee(body: NewFee, user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+    s = _own_student(db, user, body.student_id)
+    if not body.title.strip() or not 0 < body.amount <= 1_000_000:
+        raise HTTPException(422, "A fee needs a name and an amount above zero.")
+    f = Fee(student_id=s.id, title=body.title.strip()[:120], amount_due=body.amount,
+            due_date=body.due_date or config.today() + timedelta(days=7))
+    db.add(f)
+    db.commit()
+    return {"id": f.id}
+
+
+class Payment(BaseModel):
+    amount: int
+
+
+@router.post("/fees/{fee_id}/pay")
+def record_payment(fee_id: int, body: Payment, user: User = Depends(teacher_user), db: Session = Depends(get_db)):
+    f = db.get(Fee, fee_id)
+    if f is None:
+        raise HTTPException(404, "No such fee.")
+    _own_student(db, user, f.student_id)
+    balance = f.amount_due - f.amount_paid
+    if not 0 < body.amount <= balance:
+        raise HTTPException(422, f"Only {rupees(balance)} is pending on this fee." if balance
+                            else "This fee is already paid.")
+    f.amount_paid += body.amount
+    db.commit()
+    return {"ok": True, "balance": f.amount_due - f.amount_paid}
 
 
 # ---- inbox: what parents sent back ----
@@ -302,7 +383,8 @@ def send_now(body: SendBody, user: User = Depends(teacher_user), db: Session = D
 
 
 @router.post("/reset")
-def reset_demo(user: User = Depends(teacher_user)):
+def reset_demo(user: User = Depends(teacher_user), db: Session = Depends(get_db)):
     """Wipe everything back to the seed data."""
+    db.close()  # Postgres won't drop a table this request is still reading
     reset_db()
     return {"ok": True}

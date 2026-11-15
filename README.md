@@ -6,6 +6,9 @@ their child in their own language and can ask anything back.
 My entry for Gnani AI's Great Indian AI Internship Challenge, built on Gnani's
 Prisma (speech to text) and Timbre (text to speech).
 
+Try it: https://ghanti-agent.vercel.app. No password, and every student and
+parent in it is made up.
+
 ## Architecture
 
 <img src="docs/architecture.svg" alt="Architecture: a teacher and a parent reach the server through their pages. The server steps are the school API, listen, agent, tools, speak and reports. Tools read and save school records in the DB, and speech and model APIs sit outside." width="100%">
@@ -48,10 +51,21 @@ npm run dev
 
 Open http://localhost:3000 and pick a demo account.
 
-It starts with `SPEECH_MODE=mock`, which spends no Gnani credits: you type, and
-replies play a beep. Set `SPEECH_MODE=gnani` in `api/.env` for real speech.
+It starts with `SPEECH_MODE=mock`, which spends no Gnani credits: the Chat tab
+gets a menu of sample lines to send, and replies play a beep. Set
+`SPEECH_MODE=gnani` in `api/.env` for real speech.
+
+The teacher's Chat is voice only. Anything typed goes through the + Add buttons
+on the Homework, Students and Fees tabs.
 
 Tests: `cd api && .venv/bin/python -m pytest`
+
+## Deploying
+
+Two Vercel projects from one repo: `api/` (FastAPI, with `api/vercel.json` for
+the region, time limit and the daily job) and `web/` (Next.js, with `API_URL`
+set to the backend's address). The backend needs `DATABASE_URL` for Postgres,
+both API keys, `SESSION_SECRET`, `CRON_SECRET` and `SPEECH_MODE=gnani`.
 
 ## Where things are
 

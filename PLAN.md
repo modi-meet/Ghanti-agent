@@ -5,13 +5,15 @@ get reports and ask questions in their own language.
 
 ## What it does
 
-**Teacher** has a Chat tab that does everything. They speak:
+**Teacher** has a Chat tab that does everything, by voice only. They speak:
 
 > "Class 8B physics homework is lesson 3 examples 1 to 5, and chemistry read lesson 2 fully for tomorrow."
 
 The agent calls tools, the entries land in the dashboard, and the same data
 shows on the parent portal. Same for notes, absences and fees. Other tabs
-(Homework, Attendance, Students, Fees, Inbox) are there to look and edit by hand.
+(Homework, Attendance, Students, Fees, Inbox) are there to look and to do the
+same things by hand: each has a + Add button (homework, a note, a fee, a
+payment), and attendance changes with a click.
 
 **Parent** gets a daily homework voice message and a weekly report "call" on
 the website, in their language. They hold a button to ask questions. The agent
@@ -74,7 +76,7 @@ Guardrails that live in code, not in the prompt:
 
 ```
 web/   Next.js 16 + Tailwind + shadcn/ui   -> Vercel
-api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Mumbai region
+api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Singapore region
        Postgres (Neon) when deployed, a SQLite file locally
 ```
 
@@ -89,10 +91,11 @@ api/   FastAPI, SQLAlchemy                  -> Vercel, second project, Mumbai re
 ## Spending credits carefully
 
 - One Gnani API key for everything.
-- `SPEECH_MODE=mock` is the default: a beep out, a canned line in, zero credits. Every screen also takes typed text.
+- `SPEECH_MODE=mock` is the default: a beep out, a canned line in, zero credits. In mock mode the teacher's Chat gets a menu of sample lines to send, since the mic hears nothing.
 - Every Timbre result is cached. Nothing is spoken twice.
 - Real speech is capped per user and per day (`VOICE_CAP_PER_USER`, `VOICE_CAP_TOTAL`).
-- Used so far: 9 calls. 5 in the smoke test, 4 in the one real voice loop.
+- Used so far: 10 calls. 5 in the smoke test, 4 in the one real voice loop, 1 checking the live site.
+- The live site runs real speech, capped at 100 calls a day in total.
 
 ## Where it stands
 
@@ -100,16 +103,16 @@ Done and checked:
 
 - [x] Smoke test in Hindi and Gujarati (results in [API.md](API.md))
 - [x] Backend: schema, seed, logins, agent loop, both tool sets, undo/confirm, reports, inbox, cron endpoint
-- [x] 17 backend tests pass (both modes, tools, guardrails) using a scripted LLM
+- [x] 21 backend tests pass (both modes, tools, guardrails, the + Add routes) using a scripted LLM
 - [x] Frontend on shadcn/ui: login, teacher Chat and five tabs, parent portal, call screen
 - [x] Real Gemini, teacher side, both modes: seven instructions in English and Hinglish, all right. 2 to 3 seconds in tools mode, about 1.5 in single mode
 - [x] Real Gemini, parent side, both modes: weekly call and homework message written in Gujarati and Hindi, questions answered from tools, private note not leaked, other students refused, question passed to the teacher's inbox
 - [x] Real voice loop once: Gujarati audio in, Prisma, agent with two tools, Timbre audio out, about 6 seconds end to end
+- [x] Deployed: https://ghanti-agent.vercel.app. Backend and database are both in Singapore, since the database isn't offered in Mumbai. Checked live: login, a teacher turn (2 seconds), one real Timbre reply, the weekly call (11 seconds for 8 parents), a parent question, the call summary, the daily job refusing a request without its secret
 
 Not done:
 
 - [ ] Speaking into the mic in a browser. The real voice loop was fed a Timbre clip, not a person.
-- [ ] Deploy: Vercel login, Neon database, env vars, Vercel config for FastAPI and the daily cron
 - [ ] Test on a real phone
 
 Known rough edges from the real runs:
@@ -121,8 +124,8 @@ Known rough edges from the real runs:
 ## Risks to check at deploy
 
 - Vercel has no WebSockets and no ffmpeg. Both are designed around (REST clips, WAV from the browser).
-- Vercel function time limit. The weekly call writes one script per child in a single request, eight Gemini calls in a row. Fine locally, needs checking on the plan's limit.
-- Hobby cron runs once a day, which is all this needs.
+- Vercel function time limit. The weekly call writes one script per child in a single request, eight Gemini calls in a row. It takes 11 seconds live, against a limit set to 120.
+- Hobby cron runs once a day, which is all this needs. It's set for about 5 pm IST.
 - The Gnani free account allows one request at a time. Calls retry on 429, but two parents talking at once will feel it.
 
 ## Rules

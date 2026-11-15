@@ -19,7 +19,7 @@ def _spend(db: Session, user: User) -> None:
     rows = db.query(Usage).filter_by(day=day).all()
     mine = next((r for r in rows if r.user_id == user.id), None)
     if sum(r.count for r in rows) >= config.VOICE_CAP_TOTAL or (mine and mine.count >= config.VOICE_CAP_PER_USER):
-        raise HTTPException(429, "Today's voice limit for the demo is used up. Typing still works.")
+        raise HTTPException(429, "Today's voice limit for the demo is used up. It resets tomorrow.")
     if mine is None:
         mine = Usage(day=day, user_id=user.id, count=0)
         db.add(mine)

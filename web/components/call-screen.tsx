@@ -99,8 +99,15 @@ export function CallScreen({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-stone-950 text-stone-50">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden px-5 pt-12 pb-6">
-        <div className="flex flex-col items-center text-center">
+      {/* A phone-shaped column. On a wide screen: the call on the left, what was said beside it. */}
+      <div
+        className={cn(
+          "mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-hidden px-5 pt-12 pb-6",
+          stage === "live" &&
+            "lg:grid lg:max-w-5xl lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-[1fr_auto_auto_auto_1fr] lg:gap-x-12 lg:px-8 lg:py-10",
+        )}
+      >
+        <div className="flex flex-col items-center text-center lg:col-start-1 lg:row-start-2">
           <div className="relative grid size-20 place-items-center rounded-full bg-voice text-voice-foreground">
             {stage === "ringing" && <span className="absolute -inset-2 animate-ping rounded-full border-2 border-voice/60" />}
             <BellRinging weight="fill" className={cn("size-9", stage === "ringing" && "animate-bounce")} />
@@ -129,7 +136,12 @@ export function CallScreen({
           </div>
         ) : (
           <>
-            <div className="mt-8 flex-1 space-y-3 overflow-y-auto">
+            <div className="mt-8 flex-1 space-y-3 overflow-y-auto lg:col-start-2 lg:row-span-5 lg:row-start-1 lg:mt-0 lg:min-h-0 lg:rounded-3xl lg:border lg:border-stone-800 lg:bg-stone-900/40 lg:p-6">
+              {turns.length === 0 && callId && (
+                <p className="hidden h-full place-items-center text-sm text-stone-500 lg:grid">
+                  Hold the mic and ask about homework, attendance, fees or how class is going.
+                </p>
+              )}
               {turns.map((t) => (
                 <div key={t.id} className={cn("flex", t.role === "user" && "justify-end")}>
                   <p
@@ -145,7 +157,7 @@ export function CallScreen({
               <div ref={bottom} />
             </div>
 
-            <div className="mt-5 grid grid-cols-3 items-center">
+            <div className="mt-5 grid grid-cols-3 items-center lg:col-start-1 lg:row-start-3 lg:mt-10">
               <div />
               <div className="flex flex-col items-center gap-2">
                 <MicButton large busy={busy || !callId} onClip={(audio) => send({ audio })} />
@@ -159,7 +171,7 @@ export function CallScreen({
             </div>
 
             <form
-              className="mt-5 flex h-11 items-center gap-1.5 rounded-full border border-stone-800 bg-stone-900 pr-1.5 pl-4"
+              className="mt-5 flex h-11 items-center gap-1.5 rounded-full border border-stone-800 bg-stone-900 pr-1.5 pl-4 lg:col-start-1 lg:row-start-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!text.trim() || busy) return;

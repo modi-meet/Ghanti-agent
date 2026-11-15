@@ -13,10 +13,12 @@ export function MicButton({
   onClip,
   busy,
   large,
+  onRecording,
 }: {
   onClip: (clip: Blob) => void;
   busy?: boolean;
   large?: boolean;
+  onRecording?: (recording: boolean) => void;
 }) {
   const finishRef = useRef<() => void>(() => {});
   const { recording, start, stop } = useRecorder(useCallback(() => finishRef.current(), []));
@@ -28,13 +30,14 @@ export function MicButton({
   useEffect(() => {
     finishRef.current = finish;
   }, [finish]);
+  useEffect(() => onRecording?.(recording), [recording, onRecording]);
 
   const begin = async () => {
     if (busy || recording) return;
     try {
       await start();
     } catch {
-      toast.error("Can't reach the microphone. Allow mic access, or type instead.");
+      toast.error("Can't reach the microphone. Allow mic access in the browser and try again.");
     }
   };
 

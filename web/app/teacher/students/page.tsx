@@ -1,10 +1,12 @@
 "use client";
 
-import { Eye, EyeSlash, Trash } from "@phosphor-icons/react";
+import { Eye, EyeSlash, Plus, Trash } from "@phosphor-icons/react";
 import useSWR from "swr";
 
+import { AddSheet, Field } from "@/components/add-sheet";
 import { type Mark, PageHeader, Person, Section, Status, WeekBars } from "@/components/bits";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api, fetcher, LANGUAGES } from "@/lib/api";
 import { rupees } from "@/lib/format";
@@ -56,13 +58,33 @@ export default function StudentsPage() {
                 <WeekBars week={s.week} />
               </div>
 
-              <div className="flex flex-wrap gap-1.5 border-t px-5 py-3">
+              <div className="flex flex-wrap items-center gap-1.5 border-t py-3 pr-3 pl-5">
                 <Status tone={absent >= 3 ? "bad" : absent ? "warn" : "good"}>
                   {absent ? `${absent} absent this week` : "Full attendance"}
                 </Status>
                 <Status tone={s.fee_balance > 0 ? "warn" : "good"}>
                   {s.fee_balance > 0 ? `${rupees(s.fee_balance)} due` : "Fees paid"}
                 </Status>
+                <AddSheet
+                  title={`Note for ${s.name}`}
+                  hint={`${s.parent} can ask Ghanti about this unless you keep it private.`}
+                  button={
+                    <Button variant="outline" size="xs" className="ml-auto">
+                      <Plus weight="bold" /> Add note
+                    </Button>
+                  }
+                  onSave={(v) =>
+                    api(`/teacher/students/${s.id}/notes`, { method: "POST", json: { text: v.text, private: v.private === "on" } })
+                  }
+                >
+                  <Field label="Note">
+                    <Textarea name="text" required maxLength={1000} placeholder="Topped the science quiz this week" />
+                  </Field>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="private" className="size-4 accent-foreground" />
+                    Only for me. Parents won&apos;t hear it.
+                  </label>
+                </AddSheet>
               </div>
 
               <ul className="divide-y border-t">

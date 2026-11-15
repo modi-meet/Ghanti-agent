@@ -25,7 +25,7 @@ class MockSpeech:
     name = "mock"
 
     def transcribe(self, audio: bytes, filename: str, languages: list[str], keyterms: list[str]) -> Transcript:
-        return Transcript("(mock speech) Type your message instead, or set SPEECH_MODE=gnani.", languages[0])
+        return Transcript("(mock speech) Nothing was heard. Set SPEECH_MODE=gnani for real speech.", languages[0])
 
     def synthesize(self, text: str, language: str) -> bytes:
         return (Path(__file__).parent / "mock.mp3").read_bytes()

@@ -5,6 +5,7 @@ import {
   BellRinging,
   BookOpenText,
   CalendarCheck,
+  CaretDown,
   CaretRight,
   CurrencyInr,
   NotePencil,
@@ -18,13 +19,16 @@ import { toast } from "sonner";
 
 import { ActionList } from "@/components/action-card";
 import { ListenButton, PageHeader, Person, Section, Tag } from "@/components/bits";
-import { Composer, type Said } from "@/components/composer";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { MicButton } from "@/components/mic-button";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { fetcher, say, type Exchange, type Turn } from "@/lib/api";
 import { rupees } from "@/lib/format";
 import { play } from "@/lib/player";
+import { useMe } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 type Overview = {
@@ -44,11 +48,15 @@ const TRY = [
   { icon: Question, line: "Who has been absent the most this week?" },
 ];
 
+type Said = { audio?: Blob; text?: string };
+
 export default function Chat() {
+  const me = useMe("teacher");
   const { mutate } = useSWRConfig();
   const { data: turns, mutate: setTurns } = useSWR<Turn[]>("/teacher/chat", fetcher, { revalidateOnFocus: false });
   const { data: overview } = useSWR<Overview>("/teacher/overview", fetcher);
   const [busy, setBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,7 +73,7 @@ export default function Chat() {
       const exchange = await say<Exchange>("/teacher/chat", said);
       await setTurns((old) => [...(old ?? []), exchange.user, exchange.assistant], { revalidate: false });
       refreshDashboard();
-      // Spoke to it, so it speaks back. Typed, so it stays quiet.
+      // Spoke to it, so it speaks back.
       if (said.audio && exchange.assistant.audio_url) play(exchange.assistant.audio_url);
     } catch (e) {
       toast.error((e as Error).message);
@@ -83,18 +91,13 @@ export default function Chat() {
             <ItemGroup className="gap-2">
               <div className="mb-1 text-xs font-medium text-muted-foreground">Try saying</div>
               {TRY.map(({ icon: Icon, line }) => (
-                <Item key={line} variant="outline" size="sm" asChild className="flex-nowrap bg-card">
-                  <button disabled={busy} onClick={() => send({ text: line })} className="text-left">
-                    <ItemMedia variant="icon">
-                      <Icon weight="duotone" className="size-5" />
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle className="line-clamp-none font-normal">{line}</ItemTitle>
-                    </ItemContent>
-                    <ItemActions>
-                      <ArrowRight className="size-4 text-muted-foreground" />
-                    </ItemActions>
-                  </button>
+                <Item key={line} variant="outline" size="sm" className="flex-nowrap bg-card">
+                  <ItemMedia variant="icon">
+                    <Icon weight="duotone" className="size-5" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle className="line-clamp-none font-normal">“{line}”</ItemTitle>
+                  </ItemContent>
                 </Item>
               ))}
             </ItemGroup>
@@ -109,11 +112,32 @@ export default function Chat() {
           <div ref={bottom} />
         </div>
 
-        <div className="sticky bottom-0 -mx-2 mt-6 bg-background px-2 pt-2 pb-1">
-          <Composer onSend={send} busy={busy} placeholder="Tell Ghanti what happened in class" />
-          <p className="mt-2 px-1 text-xs text-muted-foreground">
-            Hold the mic, or focus it and hold <Kbd>Space</Kbd>, to talk. Hindi and English mixed is fine.
+        {/* Voice only. Anything typed goes through the + Add buttons on each tab. */}
+        <div className="sticky bottom-0 -mx-2 mt-6 flex flex-col items-center gap-2 bg-background px-2 pt-4 pb-1 text-center">
+          <MicButton large busy={busy} onClip={(audio) => send({ audio })} onRecording={setRecording} />
+          <div className="text-sm font-medium">
+            {recording ? "Listening. Let go to send." : busy ? "Working on it" : "Hold to talk"}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Hindi and English mixed is fine. You can also focus the mic and hold <Kbd>Space</Kbd>.
           </p>
+          {me?.speech_mode === "mock" && (
+            // Mock speech hears nothing, so local runs send a sample line instead.
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="xs" className="text-muted-foreground" disabled={busy}>
+                  Mock speech is on. Send a sample line <CaretDown />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" className="w-96 max-w-[90vw]">
+                {TRY.map(({ line }) => (
+                  <DropdownMenuItem key={line} className="whitespace-normal" onClick={() => send({ text: line })}>
+                    {line}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

@@ -61,8 +61,10 @@ export default function ParentHome() {
     );
   }
 
+  // One column on a phone. On a wide screen the school's messages take the
+  // left, and the week and homework sit beside them.
   return (
-    <div className="mx-auto max-w-md space-y-4 px-4 pt-4 pb-10">
+    <div className="mx-auto max-w-md space-y-4 px-4 pt-4 pb-10 lg:max-w-5xl lg:px-8 lg:pt-8">
       <header className="flex items-center gap-3 py-1">
         <Person name={data.child.name} size="lg" />
         <div className="min-w-0 flex-1 leading-tight">
@@ -93,7 +95,8 @@ export default function ParentHome() {
         </button>
       )}
 
-      <Section title="This week" flush>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] lg:gap-6">
+      <Section title="This week" flush className="lg:col-start-2 lg:row-start-1">
         <div className="grid grid-cols-2 divide-x">
           <div className="px-5 py-4">
             <Stat value={attendance.days_present} unit={`of ${attendance.school_days} days`} label="In school" />
@@ -127,6 +130,7 @@ export default function ParentHome() {
       <Section
         title="From the school"
         flush
+        className="lg:col-start-1 lg:row-span-2 lg:row-start-1"
         action={
           <Button size="sm" onClick={() => open(null)}>
             <Phone weight="fill" /> Ask the school
@@ -152,7 +156,7 @@ export default function ParentHome() {
                         {m.title}
                         {!m.heard && <span className="size-1.5 rounded-full bg-voice" />}
                       </ItemTitle>
-                      <ItemDescription className="line-clamp-1">{m.script}</ItemDescription>
+                      <ItemDescription className="line-clamp-1 lg:line-clamp-2">{m.script}</ItemDescription>
                     </ItemContent>
                     <ItemActions className="text-xs text-muted-foreground tabular-nums">
                       {time(m.created_at)}
@@ -166,7 +170,7 @@ export default function ParentHome() {
         )}
       </Section>
 
-      <Section title="Homework" flush>
+      <Section title="Homework" flush className="lg:col-start-2 lg:row-start-2">
         {data.homework.length === 0 ? (
           <Nothing icon={<BookOpenText />} title="Nothing in the last few days" />
         ) : (
@@ -183,6 +187,7 @@ export default function ParentHome() {
           </ul>
         )}
       </Section>
+      </div>
 
       <p className="px-4 pt-2 text-center text-xs leading-relaxed text-muted-foreground">
         A demo with made-up data. This page stands in for a real phone call from {data.teacher}&apos;s class.

@@ -1,11 +1,15 @@
 "use client";
 
+import { Plus } from "@phosphor-icons/react";
 import useSWR from "swr";
 
+import { AddSheet, Field, Select } from "@/components/add-sheet";
 import { PageHeader, Person, Section, Stat, Status } from "@/components/bits";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetcher } from "@/lib/api";
+import { api, fetcher } from "@/lib/api";
 import { day, rupees } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -24,11 +28,47 @@ const TONE = { paid: "good", due: "warn", overdue: "bad" } as const;
 
 export default function FeesPage() {
   const { data } = useSWR<Fee[]>("/teacher/fees", fetcher);
+  const { data: students } = useSWR<{ id: number; name: string }[]>("/teacher/students", fetcher);
   const total = (key: "amount_paid" | "balance") => data?.reduce((n, f) => n + f[key], 0) ?? 0;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="Fees" hint="Record a payment by telling Ghanti. It asks you to confirm before saving." />
+      <PageHeader title="Fees" hint="Tell Ghanti about a payment or a new fee, or put it in here.">
+        <AddSheet
+          title="Add a fee"
+          hint="A new amount for one student to pay."
+          button={
+            <Button size="sm">
+              <Plus weight="bold" /> Add fee
+            </Button>
+          }
+          onSave={(v) =>
+            api("/teacher/fees", {
+              method: "POST",
+              json: { student_id: Number(v.student_id), title: v.title, amount: Number(v.amount), due_date: v.due_date || null },
+            })
+          }
+        >
+          <Field label="Student">
+            <Select name="student_id" required>
+              {students?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="What it is for">
+            <Input name="title" required maxLength={120} placeholder="Science fair trip" />
+          </Field>
+          <Field label="Amount in rupees">
+            <Input name="amount" type="number" inputMode="numeric" required min={1} step={1} placeholder="800" />
+          </Field>
+          <Field label="Due" hint="Leave empty for a week from today.">
+            <Input name="due_date" type="date" />
+          </Field>
+        </AddSheet>
+      </PageHeader>
 
       <Section flush>
         <div className="grid grid-cols-3 divide-x">
@@ -52,7 +92,8 @@ export default function FeesPage() {
               <TableHead>Fee</TableHead>
               <TableHead className="w-52">Paid</TableHead>
               <TableHead className="w-24">Due</TableHead>
-              <TableHead className="w-28 pr-5">Status</TableHead>
+              <TableHead className="w-24">Status</TableHead>
+              <TableHead className="w-36 pr-4" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -81,8 +122,27 @@ export default function FeesPage() {
                 <TableCell className="text-muted-foreground tabular-nums">
                   {day(f.due_date, { day: "numeric", month: "short" })}
                 </TableCell>
-                <TableCell className="pr-5 capitalize">
+                <TableCell className="capitalize">
                   <Status tone={TONE[f.status]}>{f.status}</Status>
+                </TableCell>
+                <TableCell className="pr-4 text-right">
+                  {f.balance > 0 && (
+                    <AddSheet
+                      title="Record a payment"
+                      hint={`${f.student}, ${f.title}. ${rupees(f.balance)} is pending.`}
+                      save="Record payment"
+                      button={
+                        <Button variant="outline" size="xs">
+                          <Plus weight="bold" /> Payment
+                        </Button>
+                      }
+                      onSave={(v) => api(`/teacher/fees/${f.id}/pay`, { method: "POST", json: { amount: Number(v.amount) } })}
+                    >
+                      <Field label="Amount received, in rupees">
+                        <Input name="amount" type="number" inputMode="numeric" required min={1} max={f.balance} step={1} defaultValue={f.balance} />
+                      </Field>
+                    </AddSheet>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
